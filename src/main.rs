@@ -1,16 +1,19 @@
 #![feature(rustc_private)]
 #![feature(box_patterns)]
 
+extern crate rustc_data_structures;
 extern crate rustc_driver;
+extern crate rustc_hir;
+extern crate rustc_index;
 extern crate rustc_interface;
+extern crate rustc_type_ir;
 extern crate rustc_middle;
 extern crate rustc_session;
-
-use std::path::PathBuf;
+extern crate rustc_span;
 
 use rustc_driver::Compilation;
 use rustc_session::config::ErrorOutputType;
-use rustc_session::EarlyDiagCtxt;
+use std::path::PathBuf;
 use log::debug;
 
 mod mirpass;
@@ -18,21 +21,18 @@ mod mirpass;
 // inspired by lockbud
 fn main() {
     // Initialize loggers.
-    println!("t1");
-    // let handler = EarlyDiagCtxt::new(ErrorOutputType::default());
-    // if std::env::var("RUSTC_LOG").is_ok() {
-    //     rustc_driver::init_rustc_env_logger(&handler);
-    // }
-    // if std::env::var("SOLCON_LOG").is_ok() {
-    //     let e = env_logger::Env::new()
-    //         .filter("SOLCON_LOG")
-    //         .write_style("SOLCON_LOG_STYLE");
-    //     env_logger::init_from_env(e);
-    // }
-    println!("t2");
+    let handler = rustc_session::EarlyDiagCtxt::new(ErrorOutputType::default());
+    if std::env::var("RUSTC_LOG").is_ok() {
+        rustc_driver::init_rustc_env_logger(&handler);
+    }
+    if std::env::var("SOLCON_LOG").is_ok() {
+        let e = env_logger::Env::new()
+            .filter("SOLCON_LOG")
+            .write_style("SOLCON_LOG_STYLE");
+        env_logger::init_from_env(e);
+    }
     let mut args = std::env::args().collect::<Vec<_>>();
     assert!(!args.is_empty());
-
     
     // Setting RUSTC_WRAPPER causes Cargo to pass 'rustc' as the first argument.
     // We're invoking the compiler programmatically, so we remove it if present.
@@ -41,7 +41,7 @@ fn main() {
     }
 
     let mut rustc_command_line_arguments: Vec<String> = args[1..].into();
-    // rustc_driver::install_ice_hook("ice ice ice baby", |_| ());
+    rustc_driver::install_ice_hook("internal complier error", |_| ());
     let result = rustc_driver::catch_fatal_errors( || {
         // Add back the binary name
         rustc_command_line_arguments.insert(0, args[0].clone());
@@ -67,6 +67,15 @@ fn main() {
             rustc_command_line_arguments.push(always_encode_mir);
         }
 
+        let link_dead_code: String = "link-dead-code".into();
+        if !rustc_command_line_arguments
+            .iter()
+            .any(|arg| arg.ends_with(&link_dead_code))
+        {
+            rustc_command_line_arguments.push("-C".into());
+            rustc_command_line_arguments.push(link_dead_code);
+        }
+ 
         let mut callbacks = Callbacks::new();
         debug!(
             "rustc_command_line_arguments {:?}",
@@ -153,8 +162,9 @@ impl rustc_driver::Callbacks for Callbacks {
             // No need to analyze a build script, but do generate code.
             return Compilation::Continue;
         }
-        queries.global_ctxt().unwrap().enter(|tcx| {
-            mirpass::inject_atomic_prints(tcx);
+        queries.global_ctxt().unwrap().enter(|tcx: rustc_middle::ty::TyCtxt| {
+            mirpass::run_our_pass(tcx);
+            tcx.analysis(());
         });
         if self.test_run {
             // We avoid code gen for test cases because LLVM is not used in a thread safe manner.
