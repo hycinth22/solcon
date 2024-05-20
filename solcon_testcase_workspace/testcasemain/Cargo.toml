@@ -1,0 +1,8 @@
+[package]
+name = "solcon_testcase"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+this_is_our_monitor_function = { path = "../this_is_our_monitor_function" }
+solcon_anothercrate = { path = "../testcaseanother" }

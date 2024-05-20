@@ -2,3 +2,6 @@
 *.mir
 *.exe
 *.pdb
+*.log
+rustc-ice-*.txt
+/solcon_testcase/all-log
