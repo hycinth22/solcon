@@ -4,8 +4,7 @@ use rustc_middle::mir::{self, BasicBlock, BasicBlockData, BorrowKind, ConstOpera
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
 
-use super::{alloc_unit_local, get_function_generic_args, search_monitor::PreScanInfo};
-
+use super::{search_monitor::PreScanInfo, utils::{alloc_unit_local, get_function_generic_args}};
 
 pub(crate) fn add_mutex_lock_before_handler<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
 prescan_info: &PreScanInfo, 
@@ -113,7 +112,7 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
                 return insert_after_call;
             }
             let func_def_id = prescan_info.mutex_lock_after_fn.unwrap();
-            dbg!(generic_args);
+            // dbg!(generic_args);
             let func_ty = tcx.type_of(func_def_id).instantiate(tcx, generic_args);
             let const_ = mir::Const::zero_sized(func_ty);
             // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
@@ -122,7 +121,7 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
             //     ty::ParamEnv::reveal_all(),
             //     ty::EarlyBinder::bind(func_ty),
             // ));
-            dbg!(func_ty);
+            // dbg!(func_ty);
             // Operand::Constant(Box::new(ConstOperand {
             //     span: DUMMY_SP,
             //     const_: const_,

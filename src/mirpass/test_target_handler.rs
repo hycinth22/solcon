@@ -7,8 +7,8 @@ use rustc_middle::mir::{self, BasicBlock, BasicBlockData, BorrowKind, ConstOpera
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
 
-use super::{alloc_unit_local, get_function_generic_args, search_monitor::PreScanInfo};
-
+use super::{search_monitor::PreScanInfo};
+use super::utils::{alloc_unit_local, get_function_generic_args};
 
 pub(crate) fn add_before_handler<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
 prescan_info: &PreScanInfo, 
@@ -109,7 +109,7 @@ pub(crate) fn add_after_handler<'tcx>(
         let ourfunc = {
             // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
             // let our_func_def_id = find_def_id_by_pat(tcx, func_path);
-            dbg!(generic_args);
+            //dbg!(generic_args);
             let func_ty = tcx.type_of(our_func_def_id).instantiate(tcx, generic_args);
             let const_ = mir::Const::zero_sized(func_ty);
             // let instance = tcx.resolve_instance(tcx.param_env(our_func_def_id).and((our_func_def_id, generic_args))).unwrap().unwrap();
@@ -118,7 +118,7 @@ pub(crate) fn add_after_handler<'tcx>(
             //     ty::ParamEnv::reveal_all(),
             //     ty::EarlyBinder::bind(func_ty),
             // ));
-            dbg!(func_ty);
+            //dbg!(func_ty);
             // Operand::Constant(Box::new(ConstOperand {
             //     span: DUMMY_SP,
             //     const_: const_,

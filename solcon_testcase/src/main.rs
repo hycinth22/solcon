@@ -1,4 +1,6 @@
 mod this_is_our_monitor_function;
+mod target;
+mod mutex;
 
 use std::sync::Mutex;
 
@@ -36,6 +38,8 @@ fn f222() {
 }
 
 fn main() {
+    target::main();
+    mutex::main();
     f();
     f2();
     println!("Hello, world!");

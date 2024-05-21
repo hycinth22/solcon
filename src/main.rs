@@ -23,11 +23,12 @@ use std::str::FromStr;
 use log::debug;
 
 mod mirpass;
+mod utils;
 
 // inspired by lockbud & miri
 fn main() {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    jemalloc_magic();
+    utils::jemalloc_magic();
 
     let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
 
@@ -50,7 +51,7 @@ fn main() {
     //     rustc_driver::init_rustc_env_logger(&early_dcx);
     // }
     if std::env::var_os("RUSTC_LOG").is_some() {
-        rustc_driver::init_logger(&early_dcx, rustc_logger_config());
+        rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
         println!("init_logger from RUSTC_LOG");
     }
 
@@ -72,7 +73,7 @@ fn main() {
         // Tell compiler where to find the std library and so on.
         // The compiler relies on the standard rustc driver to tell it, so we have to do likewise.
         rustc_command_line_arguments.push(sysroot);
-        rustc_command_line_arguments.push(find_sysroot());
+        rustc_command_line_arguments.push(utils::find_sysroot());
     }
 
     let always_encode_mir: String = "always-encode-mir".into();
@@ -98,9 +99,9 @@ fn main() {
         .iter()
         .any(|arg| arg.starts_with(&"print_mono_items"))
     {
-        // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
+        // Print mono items
         rustc_command_line_arguments.push("-Z".into());
-        rustc_command_line_arguments.push("print_mono_items=lazy".into());
+        rustc_command_line_arguments.push("print_mono_items=lazy".into()); // or eager if needed, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
     }
 
     // let link_dead_code: String = "link-dead-code".into();
@@ -129,53 +130,6 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-fn find_sysroot() -> String {
-    if let Some(sysroot) = option_env!("RUST_SYSROOT") {
-        return sysroot.to_owned();
-    }
-    let home = option_env!("RUSTUP_HOME");
-    let toolchain = option_env!("RUSTUP_TOOLCHAIN");
-    if let (Some(home), Some(toolchain)) = (home, toolchain) {
-        return format!("{}/toolchains/{}", home, toolchain);
-    }
-    let out = std::process::Command::new("rustc").arg("--print=sysroot")
-    .current_dir(".").output();
-    if let Ok(out) = out {
-        if out.status.success() {
-            let sysroot = std::str::from_utf8(&out.stdout).unwrap().trim();
-            return sysroot.to_owned();
-        }
-    }
-    panic!("Could not find sysroot. Specify the RUST_SYSROOT environment variable, \
-    or use rustup to set the compiler to use for solcon",)
-}
-
-
-fn rustc_logger_config() -> rustc_log::LoggerConfig {
-    // Start with the usual env vars.
-    let mut cfg = rustc_log::LoggerConfig::from_env("RUSTC_LOG");
-
-    // Overwrite if MIRI_LOG is set.
-    if let Ok(var) = env::var("SOLCON_LOG") {
-        // MIRI_LOG serves as default for RUSTC_LOG, if that is not set.
-        if matches!(cfg.filter, Err(env::VarError::NotPresent)) {
-            // We try to be a bit clever here: if `SOLCON_LOG` is just a single level
-            // used for everything, we only apply it to the parts of rustc that are
-            // CTFE-related. Otherwise, we use it verbatim for `RUSTC_LOG`.
-            // This way, if you set `MIRI_LOG=trace`, you get only the right parts of
-            // rustc traced, but you can also do `MIRI_LOG=miri=trace,rustc_const_eval::interpret=debug`.
-            if tracing::Level::from_str(&var).is_ok() {
-                cfg.filter = Ok(format!(
-                    "rustc_middle::mir::interpret={var},rustc_const_eval::interpret={var},miri={var}" // todo
-                ));
-            } else {
-                cfg.filter = Ok(var);
-            }
-        }
-    }
-
-    cfg
-}
 
 struct Callbacks {
     file_name: String,
@@ -200,6 +154,9 @@ fn is_root<'tcx>(tcx: rustc_middle::ty::TyCtxt<'tcx>, def_id: rustc_hir::def_id:
 impl rustc_driver::Callbacks for Callbacks {
     fn config(&mut self, config: &mut rustc_interface::interface::Config) {
         self.file_name = config.input.source_name().prefer_remapped_unconditionaly().to_string();
+        for c in &config.crate_check_cfg {
+            println!("{c}");
+        }
         debug!("Processing input file: {}", self.file_name);
         if config.opts.test {
             debug!("in test only mode");
@@ -227,6 +184,7 @@ impl rustc_driver::Callbacks for Callbacks {
             // No need to analyze a build script, but do generate code.
             return Compilation::Continue;
         }
+        println!("Processing input file: {}", self.file_name);
         let mut global_ctxt = queries.global_ctxt().unwrap();
         global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
             for item_id in tcx.hir_crate_items(()).free_items() {
@@ -253,7 +211,7 @@ impl rustc_driver::Callbacks for Callbacks {
             let early_dcx = EarlyDiagCtxt::new(tcx.sess.opts.error_format);
             if env::var_os("RUSTC_LOG").is_none() {
                 println!("init_logger");
-                rustc_driver::init_logger(&early_dcx, rustc_logger_config());
+                rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
             }
 
             // If `SOLCON_BACKTRACE` is set and `RUSTC_CTFE_BACKTRACE` is not, set `RUSTC_CTFE_BACKTRACE`.
@@ -289,39 +247,3 @@ impl rustc_driver::Callbacks for Callbacks {
     }
 }
 
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn jemalloc_magic() {
-    // These magic runes are copied from
-    // <https://github.com/rust-lang/rust/blob/e89bd9428f621545c979c0ec686addc6563a394e/compiler/rustc/src/main.rs#L39>.
-    // See there for further comments.
-    use std::os::raw::{c_int, c_void};
-
-    #[used]
-    static _F1: unsafe extern "C" fn(usize, usize) -> *mut c_void = jemalloc_sys::calloc;
-    #[used]
-    static _F2: unsafe extern "C" fn(*mut *mut c_void, usize, usize) -> c_int =
-        jemalloc_sys::posix_memalign;
-    #[used]
-    static _F3: unsafe extern "C" fn(usize, usize) -> *mut c_void = jemalloc_sys::aligned_alloc;
-    #[used]
-    static _F4: unsafe extern "C" fn(usize) -> *mut c_void = jemalloc_sys::malloc;
-    #[used]
-    static _F5: unsafe extern "C" fn(*mut c_void, usize) -> *mut c_void = jemalloc_sys::realloc;
-    #[used]
-    static _F6: unsafe extern "C" fn(*mut c_void) = jemalloc_sys::free;
-
-    // On OSX, jemalloc doesn't directly override malloc/free, but instead
-    // registers itself with the allocator's zone APIs in a ctor. However,
-    // the linker doesn't seem to consider ctors as "used" when statically
-    // linking, so we need to explicitly depend on the function.
-    #[cfg(target_os = "macos")]
-    {
-        extern "C" {
-            fn _rjem_je_zone_register();
-        }
-
-        #[used]
-        static _F7: unsafe extern "C" fn() = _rjem_je_zone_register;
-    }
-}

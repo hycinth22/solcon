@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
 use log::trace;
-use rustc_hir::def_id::DefId;
+use rustc_hir::definitions::DefPath;
+use rustc_hir::def_id::{CrateNum, DefId};
 use rustc_middle::mir::{*};
 use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::mir::ConstOperand;
 use rustc_span::DUMMY_SP;
+
+pub(crate) use crate::utils;
 
 mod search_monitor;
 mod test_target_handler;
@@ -77,32 +80,64 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     //    };
         let def_id = body.source.def_id();
         //assert!(tcx.is_codegened_item(def_id));
-        let name_path_str = tcx.def_path_str(def_id);
-        trace!("found body instance of {}", name_path_str);
+        let def_path = tcx.def_path(def_id);
+        let def_path_str = tcx.def_path_str(def_id);
+        println!("found body instance of {}", def_path_str);
         if tcx.is_foreign_item(def_id) {
             // 跳过外部函数(例如 extern "C"{} )
-            trace!("skip body instance of {} because is_foreign_item", name_path_str);
+            trace!("skip body instance of {} because is_foreign_item", def_path_str);
             continue;
         }
         // Skip promoted src
         if body.source.promoted.is_some() {
-            trace!("skip body instance of {} because promoted.is_some", name_path_str);
+            trace!("skip body instance of {} because promoted.is_some", def_path_str);
             continue;
         }
-        if filtered_function_body(name_path_str.as_str()) {
-            trace!("skip body instance of {} because filtered_function_body", name_path_str);
+        if is_filtered_def_path(tcx, &def_path) {
+            trace!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
             continue;
         }
-        println!("visiting function body of {}", name_path_str);
+        println!("visiting function body of {}", def_path_str);
         inject_for_bb(tcx, body, &info);
     }
 }
 
-
-fn filtered_function_body(fn_defpath_str: &str) -> bool {
-    return fn_defpath_str.starts_with("std::") || fn_defpath_str.starts_with("core::" );
+fn is_filtered_def_path(tcx: TyCtxt<'_>, def_path: &DefPath) -> bool {
+    is_filtered_crate(tcx, &def_path.krate)
 }
 
+fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
+    let crate_name = tcx.crate_name(*krate);
+    let crate_name_str = crate_name.as_str();
+    const FILTERED_CRATES: [&str; 14] = [
+        "alloc",
+        "backtrace",
+        "core",
+        "panic_abort",
+        "panic_unwind",
+        "portable-simd",
+        "proc_macro",
+        "profiler_builtins",
+        "rtstartup",
+        "std",
+        "stdarch",
+        "sysroot",
+        "test",
+        "unwind",
+    ];
+    if FILTERED_CRATES.contains(&crate_name_str) {
+        return true;
+    } else {
+        println!("unfiltered crate_name {crate_name_str}");
+    }
+    false
+}
+
+fn is_target_crate(tcx: TyCtxt<'_>, krate: &CrateNum, target_crates: &[&str]) -> bool {
+    let crate_name = tcx.crate_name(*krate);
+    let crate_name_str = crate_name.as_str();
+    target_crates.contains(&crate_name_str)
+}
 
 // fn find_def_id_by_path(tcx: TyCtxt<'_>, def_path: &[&str]) -> Option<DefId> {
 //     // 获取根 DefId
@@ -138,13 +173,6 @@ fn filtered_function_body(fn_defpath_str: &str) -> bool {
 //     None
 // }
 
-fn alloc_unit_local<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>) -> Local {
-    let local_decl = LocalDecl::new(tcx.types.unit, DUMMY_SP);
-    let new_local= local_decls.push(local_decl);
-    return new_local
-}
-
-
 fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_info: &search_monitor::PreScanInfo) {
     // 遍历基本块
     let bbs = body.basic_blocks.as_mut();
@@ -154,18 +182,27 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
         let this_terminator = block_data.terminator_mut();
         let kind = &mut this_terminator.kind;
         if let TerminatorKind::Call { func, ..} = kind {
-            let func_path: Option<String> = get_function_path(tcx, &body.local_decls, &func);
-            if func_path.is_none() {
-                println!("Found call to function but fail to get function path");
+            let func_def_path_str = utils::get_function_path_str(tcx, &body.local_decls, &func);
+            let func_def_path = utils::get_function_path(tcx, &body.local_decls, &func);
+            if func_def_path_str.is_none() {
+                println!("Found call to function but fail to get function DefPath");
                 continue;
             }
-            let func_path = func_path.unwrap();
-            // println!("found function call: {:?}", func_path);
-            println!("Found call to function: {:?}", func_path);
-
-            match func_path.as_str() {
-                "this_is_our_test_target_mod::this_is_our_test_target_function" => {
-                    println!("Found call to this_is_our_test_target_function: {:?}", func_path);
+            let func_def_path_str = func_def_path_str.unwrap();
+            // println!("found function call: {:?}", func_def_path_str);
+            println!("Found call to function: {:?}", func_def_path_str);
+            if func_def_path_str.ends_with("::this_is_our_test_target_mod::this_is_our_test_target_function") {
+                println!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
+                if let Some(before_fn) = prescan_info.test_target_before_fn {
+                    let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
+                    insert_before_call.extend(insertblocks);
+                } else {
+                    println!("prescan_info.test_target_before_fn.is_none");
+                }
+            }
+            match func_def_path_str.as_str() {
+                "this_is_our_test_target_mod::this_is_our_test_target_function"  => {
+                    println!("Found call to this_is_our_test_target_function: {:?}", func_def_path_str);
                     if let Some(before_fn) = prescan_info.test_target_before_fn {
                         let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
                         insert_before_call.extend(insertblocks);
@@ -174,7 +211,7 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
                     }
                 }
                 "std::sync::Mutex::<T>::lock" => {
-                    println!("Found call to mutex lock: {:?}", func_path);
+                    println!("Found call to mutex lock: {:?}", func_def_path_str);
                     let insertblocks = mutex_handler::add_mutex_lock_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block);
                     insert_before_call.extend(insertblocks);
                 }
@@ -199,27 +236,37 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
         let this_terminator = block_data.terminator_mut();
         let kind = &mut this_terminator.kind;
         if let TerminatorKind::Call { func, ..} = kind {
-            let func_path: Option<String> = get_function_path(tcx, &body.local_decls, &func);
-            if func_path.is_none() {
-                println!("Found call to function but fail to get function path");
+            let func_def_path_str = utils::get_function_path_str(tcx, &body.local_decls, &func);
+            let func_def_path = utils::get_function_path(tcx, &body.local_decls, &func);
+            if func_def_path.is_none() {
+                println!("Found call to function but fail to get function DefPath");
                 continue;
             }
-            let func_path = func_path.unwrap();
-            // println!("found function call: {:?}", func_path);
-            println!("Found call to function: {:?}", func_path);
+            let func_def_path_str = func_def_path_str.unwrap();
+            // println!("found function call: {:?}", func_def_path_str);
+            println!("Found call to function: {:?}", func_def_path_str);
 
-            match func_path.as_str() {
+            if func_def_path_str.ends_with("::this_is_our_test_target_mod::this_is_our_test_target_function") {
+                println!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
+                if let Some(after_fn) = prescan_info.test_target_after_fn {
+                    let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
+                    insert_after_call.extend(insertblocks);
+                } else {
+                    println!("prescan_info.test_target_after_fn.is_none");
+                }
+            }
+            match func_def_path_str.as_str() {
                 "this_is_our_test_target_mod::this_is_our_test_target_function" => {
-                    println!("Found call to this_is_our_test_target_function: {:?}", func_path);
+                    println!("Found call to this_is_our_test_target_function: {:?}", func_def_path_str);
                     if let Some(after_fn) = prescan_info.test_target_after_fn {
                         let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
                         insert_after_call.extend(insertblocks);
                     } else {
-                        println!("prescan_info.test_target_before_fn.is_none");
+                        println!("prescan_info.test_target_after_fn.is_none");
                     }
                 }
                 "std::sync::Mutex::<T>::lock" => {
-                    println!("Found call to mutex lock: {:?}", func_path);
+                    println!("Found call to mutex lock: {:?}", func_def_path_str);
                     let insertblocks = mutex_handler::add_mutex_lock_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block);
                     insert_after_call.extend(insertblocks);
                 }
@@ -248,7 +295,7 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
 }
 
 /*
-            if func_path == "this_is_our_monitor_function::this_is_our_test_target_function" {
+            if func_def_path_str == "this_is_our_monitor_function::this_is_our_test_target_function" {
                 println!("detect our test target function, transforming");
                 // 在函数调用之前插入我们的函数调用需要
                 // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
@@ -298,124 +345,3 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
             else 
 */
 
-
-fn get_function_path<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<String> {
-    // 通过Operand获取函数调用的名称
-    return get_function_path_from_ty(tcx, &get_operand_ty( local_decls, operand));
-}
-
-fn get_function_generic_args<'tcx, 'operand>(local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
-    // 通过Operand获取函数调用的GenericArg
-    return get_function_generic_args_from_ty(&get_operand_ty(local_decls, operand));
-}
-
-fn get_operand_ty<'tcx>(local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &Operand<'tcx>) -> Ty<'tcx> {
-    match operand {
-        Operand::Constant(box ConstOperand { const_, .. }) => {
-            match const_ {
-                Const::Ty( ty_const) => {
-                    //println!("ty!!");
-                    return ty_const.ty();
-                }
-                Const::Unevaluated(_val, ty) => {
-                    //println!("Unevaluated!!");
-                    return ty.clone();
-                }
-                Const::Val( _val, ty) => {
-                    //dbg!(_val);
-                    //println!("Val!!");
-                    return ty.clone();
-                }
-            }
-        }
-        Operand::Copy(place) | Operand::Move(place) => {
-            let ty = local_decls[place.local].ty;
-            // println!("Copy | Move !!");
-            return ty;
-        }
-    }
-}
-
-fn get_function_generic_args_from_ty<'tcx>(ty: &ty::Ty<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
-    let ty_kind: &rustc_type_ir::TyKind<TyCtxt> = ty.kind();
-    match ty_kind {
-        ty::TyKind::FnDef(_def_id, args) | ty::Closure(_def_id, args) => {
-            return Some(&args);
-        }
-        ty::FnPtr(_) => {
-            println!("get_function_args_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
-        },
-        ty::TyKind::Dynamic(_, _, _) => todo!(),
-        ty::TyKind::CoroutineClosure(_, _) => todo!(),
-        ty::TyKind::Coroutine(_, _) => unimplemented!(),
-        ty::TyKind::CoroutineWitness(_, _) => todo!(),
-        // the following all looks unlikely, but remains different branchs for debug
-        ty::TyKind::Bool => todo!(),
-        ty::TyKind::Char => todo!(),
-        ty::TyKind::Int(_) => todo!(),
-        ty::TyKind::Uint(_) => todo!(),
-        ty::TyKind::Float(_) => todo!(),
-        ty::TyKind::Adt(_, _) => todo!(),
-        ty::TyKind::Foreign(_) => todo!(),
-        ty::TyKind::Str => todo!(),
-        ty::TyKind::Array(_, _) => todo!(),
-        ty::TyKind::Pat(_, _) => todo!(),
-        ty::TyKind::Slice(_) => todo!(),
-        ty::TyKind::RawPtr(_, _) => todo!(),
-        ty::TyKind::Ref(_, _, _) => todo!(),
-        ty::TyKind::Never => todo!(),
-        ty::TyKind::Tuple(_) => todo!(),
-        ty::TyKind::Alias(_, _) => todo!(),
-        ty::TyKind::Param(_) => todo!(),
-        ty::TyKind::Bound(_, _) => todo!(),
-        ty::TyKind::Placeholder(_) => todo!(),
-        ty::TyKind::Infer(_) => todo!(),
-        ty::TyKind::Error(_) => todo!(),
-    }
-    println!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
-    None
-}
-
-fn get_function_path_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>) -> Option<String> {
-    let ty_kind = ty.kind();
-    match ty_kind {
-        ty::TyKind::FnDef(def_id, _args) | ty::Closure(def_id, _args) => {
-            let func_path_with_args = tcx.def_path_str_with_args(def_id, _args);
-            //dbg!(_args);
-            //println!("get_function_path_from_ty func_path_with_args: {}", func_path_with_args);
-            let func_path = tcx.def_path_str(*def_id);
-            return Some(func_path);
-        }
-        ty::FnPtr(_) => {
-            println!("get_function_path_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
-        },
-        ty::TyKind::Dynamic(_, _, _) => todo!(),
-        ty::TyKind::CoroutineClosure(_, _) => todo!(),
-        ty::TyKind::Coroutine(_, _) => unimplemented!(),
-        ty::TyKind::CoroutineWitness(_, _) => todo!(),
-        // the following all looks unlikely, but remains different branchs for debug
-        ty::TyKind::Bool => todo!(),
-        ty::TyKind::Char => todo!(),
-        ty::TyKind::Int(_) => todo!(),
-        ty::TyKind::Uint(_) => todo!(),
-        ty::TyKind::Float(_) => todo!(),
-        ty::TyKind::Adt(_, _) => todo!(),
-        ty::TyKind::Foreign(_) => todo!(),
-        ty::TyKind::Str => todo!(),
-        ty::TyKind::Array(_, _) => todo!(),
-        ty::TyKind::Pat(_, _) => todo!(),
-        ty::TyKind::Slice(_) => todo!(),
-        ty::TyKind::RawPtr(_, _) => todo!(),
-        ty::TyKind::Ref(_, _, _) => todo!(),
-        ty::TyKind::Never => todo!(),
-        ty::TyKind::Tuple(_) => todo!(),
-        ty::TyKind::Alias(_, _) => todo!(),
-        ty::TyKind::Param(_) => todo!(),
-        ty::TyKind::Bound(_, _) => todo!(),
-        ty::TyKind::Placeholder(_) => todo!(),
-        ty::TyKind::Infer(_) => todo!(),
-        ty::TyKind::Error(_) => todo!(),
-    }
-    println!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
-    None
-}
