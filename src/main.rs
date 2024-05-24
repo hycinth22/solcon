@@ -3,6 +3,7 @@
 #![feature(rustc_attrs)]
 #![allow(rustc::untranslatable_diagnostic)]
 #![allow(rustc::diagnostic_outside_of_impl)]
+#![allow(internal_features)]
 
 extern crate tracing; // share from rustc
 extern crate rustc_data_structures;
