@@ -1,5 +1,6 @@
+// extern crate this_is_our_monitor_function;
+
 use std::sync::Mutex;
-use solcon_anothercrate::*;
 
 fn f() {
     let m = Mutex::new(0);
@@ -8,6 +9,7 @@ fn f() {
     println!("{}", *guard);
     println!("drop");
     drop(guard);
+
     println!("droped");
 
     // let m = Mutex::new(0);
@@ -18,6 +20,7 @@ fn f() {
 
 fn f2() {
     let m = Mutex::new(0);
+    let mut guard = m.lock().unwrap();
 }
 fn f111() -> i32 {
     println!("Hello, f111!");
@@ -32,9 +35,13 @@ fn f222() {
 }
 
 fn unused() {
-    this_is_our_monitor_function::this_is_our_mutex_lock_before_handle_function(unsafe{
-        &*(0 as *const Mutex<i32>)
-    });
+    // this_is_our_monitor_function::this_is_our_mutex_lock_before_handle_function(unsafe{
+    //     &*(0 as *const Mutex<i32>)
+    // });
+    // this_is_our_monitor_function::this_is_our_mutex_lock_before_handle_function(unsafe{
+    //     &*(0 as *const Mutex<bool>)
+    // });
+    // this_is_our_monitor_function::this_is_non_generic_func(1i32);
 }
 
 fn main() {
@@ -49,6 +56,6 @@ fn main() {
     let r = move|| {
         println!("Hello, moveclosure! {}", e);
     };
-    solcon_anothercrate::fothercrate();
+    testcase_anothercrate::fothercrate();
     unused();
 }

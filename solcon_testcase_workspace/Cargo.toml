@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "testcasemain",
-    "this_is_our_monitor_function",
     "testcaseanother"
 ]
 

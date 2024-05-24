@@ -1,5 +1,5 @@
 [package]
-name = "this_is_our_monitor_function"
+name = "this_is_our_test_target_mod"
 version = "0.1.0"
 edition = "2021"
 

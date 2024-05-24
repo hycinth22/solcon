@@ -3,17 +3,19 @@
 version = 3
 
 [[package]]
-name = "solcon_anothercrate"
-version = "0.1.0"
-
-[[package]]
 name = "solcon_testcase"
 version = "0.1.0"
 dependencies = [
- "solcon_anothercrate",
- "this_is_our_monitor_function",
+ "testcase_anothercrate",
 ]
 
 [[package]]
-name = "this_is_our_monitor_function"
+name = "testcase_anothercrate"
+version = "0.1.0"
+dependencies = [
+ "this_is_our_test_target_mod",
+]
+
+[[package]]
+name = "this_is_our_test_target_mod"
 version = "0.1.0"

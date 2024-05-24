@@ -1,6 +1,7 @@
 [package]
-name = "solcon_anothercrate"
+name = "testcase_anothercrate"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+this_is_our_test_target_mod = { path = "../this_is_our_test_target_mod" }
