@@ -10,8 +10,8 @@ pub(crate) struct PreScanInfo {
     pub mutex_lock_after_fn: Option<DefId>,
 }
 
-pub(crate) fn try_match_with_our_function<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx Body<'tcx>, info: &mut PreScanInfo)  {
-    let def_id: DefId = body.source.def_id();
+pub(crate) fn try_match_with_our_function<'tcx>(tcx: TyCtxt<'tcx>, fn_def_id: &DefId, info: &mut PreScanInfo)  {
+    let def_id = fn_def_id.clone();
     let fn_defpath_str = tcx.def_path_str(def_id);
     println!("try_match_with_our_function {}", fn_defpath_str);
     match fn_defpath_str.as_str() {

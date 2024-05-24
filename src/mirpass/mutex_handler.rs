@@ -19,7 +19,7 @@ prescan_info: &PreScanInfo,
             println!("generic_args.is_none");
             return insert_before_call;
         }
-        let generic_args = generic_args.unwrap();
+        let mut generic_args = generic_args.unwrap();
         // 在函数调用之前插入我们的函数调用需要
         // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
         // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
@@ -31,7 +31,16 @@ prescan_info: &PreScanInfo,
                 return insert_before_call;
             }
             let func_def_id = prescan_info.mutex_lock_before_fn.unwrap();
-            let func_ty = tcx.type_of(func_def_id).instantiate(tcx, generic_args);
+            let is_generic_func = tcx.generics_of(func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+            let func_ty = {
+                let binder = tcx.type_of(func_def_id);
+                let generics = tcx.generics_of(func_def_id);
+                if is_generic_func{
+                    binder.instantiate(tcx, generic_args)
+                } else {
+                    binder.instantiate_identity()
+                }
+            };
             let const_ = mir::Const::zero_sized(func_ty);
             // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
             // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
@@ -45,7 +54,11 @@ prescan_info: &PreScanInfo,
             //     const_: const_,
             //     user_ty: None,
             // }))
-            Operand::function_handle(tcx, func_def_id, generic_args, fn_span.clone())
+            if is_generic_func {
+                Operand::function_handle(tcx, func_def_id, generic_args, fn_span.clone())
+            } else {
+                Operand::function_handle(tcx, func_def_id, [], fn_span.clone())
+            }
         };
         // this_terminator.target will be modify later because new block have not been inserted yet
         let mut our_args = {
@@ -113,7 +126,16 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
             }
             let func_def_id = prescan_info.mutex_lock_after_fn.unwrap();
             // dbg!(generic_args);
-            let func_ty = tcx.type_of(func_def_id).instantiate(tcx, generic_args);
+            let is_generic_func = tcx.generics_of(func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+            let func_ty = {
+                let binder = tcx.type_of(func_def_id);
+                let generics = tcx.generics_of(func_def_id);
+                if is_generic_func{
+                    binder.instantiate(tcx, generic_args)
+                } else {
+                    binder.instantiate_identity()
+                }
+            };
             let const_ = mir::Const::zero_sized(func_ty);
             // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
             // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
@@ -127,7 +149,11 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
             //     const_: const_,
             //     user_ty: None,
             // }))
-            Operand::function_handle(tcx, func_def_id, generic_args, fn_span.clone())
+            if is_generic_func {
+                Operand::function_handle(tcx, func_def_id, generic_args, fn_span.clone())
+            } else {
+                Operand::function_handle(tcx, func_def_id, [], fn_span.clone())
+            }
         };
 
         // 为了传入返回值，先构造一条创建引用的statement并插到我们的函数调用前

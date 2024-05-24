@@ -5,6 +5,7 @@ use rustc_hir::definitions::DefPath;
 use rustc_hir::def_id::{CrateNum, DefId};
 use rustc_middle::mir::{*};
 use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
+use rustc_middle::middle::exported_symbols::ExportedSymbol;
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::mir::ConstOperand;
 use rustc_span::DUMMY_SP;
@@ -38,11 +39,76 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     // for def_id in items.iter() {
     //     let body = tcx.optimized_mir(def_id);
     for local_def_id in all_function_local_def_ids {
+        if !tcx.hir().body_owner_kind(*local_def_id).is_fn_or_closure() {
+            continue;
+        }
         let def_id = local_def_id.to_def_id();
         let body = tcx.optimized_mir(def_id);
     // for instance in instances.iter() {
     //     let body = tcx.instance_mir(instance.def);
-        search_monitor::try_match_with_our_function(tcx, body, &mut info);
+        search_monitor::try_match_with_our_function(tcx, &body.source.def_id(), &mut info);
+    }
+    let crates = tcx.crates(());
+    for krate in crates {
+        let krate = krate.clone();
+        if is_filtered_crate(tcx, &krate) {
+            continue;
+        }
+        let crate_name = tcx.crate_name(krate);
+        let crate_name_str = crate_name.as_str();
+        // let dep_kind = tcx.dep_kind(krate);
+
+        //let reachable_non_generics = tcx.reachable_non_generics(krate);
+        // for def_id in reachable_non_generics.items() {
+        //     let def_path = tcx.def_path(def_id);
+        //     let def_path_str = tcx.def_path_str(def_id);
+        //     println!("found reachable_non_generics of {}", def_path_str);
+        //     if is_filtered_def_path(tcx, &def_path) {
+        //         trace!("skip reachable_non_generics of {:?} because utils::is_filtered_def_path", def_path_str);
+        //         continue;
+        //     }
+        //     let body = tcx.optimized_mir(def_id);
+        //     search_monitor::try_match_with_our_function(tcx, body, &mut info);
+        // }
+        println!("visiting crate {}", crate_name_str);
+        tcx.import_source_files(krate);
+        let exported_symbols = tcx.exported_symbols(krate);
+        for (symbol, symbol_export_info) in exported_symbols.iter() {
+            match symbol {
+                ExportedSymbol::NonGeneric(def_id) => {
+                    let def_path = tcx.def_path(*def_id);
+                    let def_path_str = tcx.def_path_str(*def_id);
+                    println!("found NonGeneric exported_symbols {} {}", def_path_str, symbol_export_info.used);
+                    // if is_filtered_def_path(tcx, &def_path) {
+                    //     trace!("skip NonGeneric exported_symbols {:?} because utils::is_filtered_def_path", def_path_str);
+                    //     continue;
+                    // }
+                    search_monitor::try_match_with_our_function(tcx, &def_id, &mut info);
+                }
+                ExportedSymbol::Generic(def_id, generic_args) => {
+                    let def_path = tcx.def_path(*def_id);
+                    let def_path_str = tcx.def_path_str(*def_id);
+                    println!("found Generic exported_symbols {} {}", def_path_str, symbol_export_info.used);
+                    // if is_filtered_def_path(tcx, &def_path) {
+                    //     trace!("skip Generic exported_symbols {:?} because utils::is_filtered_def_path", def_path_str);
+                    //     continue;
+                    // }
+                    search_monitor::try_match_with_our_function(tcx, &def_id, &mut info);
+                }
+                ExportedSymbol::DropGlue(ty) | ExportedSymbol::AsyncDropGlueCtorShim(ty) => {
+                    let ty_str = ty.to_string();
+                    println!("found DropGlue or AsyncDropGlueCtorShim exported_symbols {}", ty_str);
+                }
+                ExportedSymbol::ThreadLocalShim(def_id) => {
+                    let def_path = tcx.def_path(*def_id);
+                    let def_path_str = tcx.def_path_str(*def_id);
+                    println!("found ThreadLocalShim exported_symbols {}", def_path_str);
+                }
+                ExportedSymbol::NoDefId(symbol_name) => {
+                    println!("found NoDefId exported_symbols {}", symbol_name);
+                }
+            }
+        }
     }
     dbg!(&info);
     // for instance in instances.iter() {
@@ -57,6 +123,9 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     //         &mut *mutable_ptr
     //    };
     for local_def_id in all_function_local_def_ids {
+        if !tcx.hir().body_owner_kind(*local_def_id).is_fn_or_closure() {
+            continue;
+        }
         let def_id = local_def_id.to_def_id();
         #[allow(invalid_reference_casting)]
         let body =  unsafe{
@@ -107,9 +176,14 @@ fn is_filtered_def_path(tcx: TyCtxt<'_>, def_path: &DefPath) -> bool {
 }
 
 fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
+    if tcx.is_panic_runtime(*krate) || tcx.is_compiler_builtins(*krate)
+    {
+        return true;
+    }
     let crate_name = tcx.crate_name(*krate);
     let crate_name_str = crate_name.as_str();
-    const FILTERED_CRATES: [&str; 14] = [
+    const FILTERED_CRATES: [&str; 27] = [
+        // from rustc library(s)
         "alloc",
         "backtrace",
         "core",
@@ -119,11 +193,25 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
         "proc_macro",
         "profiler_builtins",
         "rtstartup",
+        "rustc_std_workspace_alloc",
+        "rustc_std_workspace_core",
+        "rustc_std_workspace_std",
         "std",
         "stdarch",
         "sysroot",
         "test",
         "unwind",
+        // other common underlying libraries
+        "adler",
+        "addr2line",
+        "gimli",
+        "object",
+        "memchr",
+        "miniz_oxide",
+        "hashbrown",
+        "rustc_demangle",
+        "std_detect",
+        "libc"
     ];
     if FILTERED_CRATES.contains(&crate_name_str) {
         return true;

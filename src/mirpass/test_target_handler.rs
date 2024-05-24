@@ -32,8 +32,16 @@ our_func_def_id: DefId
         let ourfunc = {
             // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
             // let func_def_id = find_def_id_by_pat(tcx, func_path);
-            let func_ty = tcx.type_of(our_func_def_id).instantiate(tcx, generic_args);
-            let const_ = mir::Const::zero_sized(func_ty);
+            let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+            let func_ty = {
+                let binder = tcx.type_of(our_func_def_id);
+                let generics = tcx.generics_of(our_func_def_id);
+                if is_generic_func{
+                    binder.instantiate(tcx, generic_args)
+                } else {
+                    binder.instantiate_identity()
+                }
+            };
             // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
             // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
             //     tcx,
@@ -46,7 +54,11 @@ our_func_def_id: DefId
             //     const_: const_,
             //     user_ty: None,
             // }))
-            Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
+            if is_generic_func {
+                Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
+            } else {
+                Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
+            }
         };
         // this_terminator.target will be modify later because new block have not been inserted yet
         let mut our_args = {
@@ -110,7 +122,16 @@ pub(crate) fn add_after_handler<'tcx>(
             // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
             // let our_func_def_id = find_def_id_by_pat(tcx, func_path);
             //dbg!(generic_args);
-            let func_ty = tcx.type_of(our_func_def_id).instantiate(tcx, generic_args);
+            let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+            let func_ty = {
+                let binder = tcx.type_of(our_func_def_id);
+                let generics = tcx.generics_of(our_func_def_id);
+                if is_generic_func{
+                    binder.instantiate(tcx, generic_args)
+                } else {
+                    binder.instantiate_identity()
+                }
+            };
             let const_ = mir::Const::zero_sized(func_ty);
             // let instance = tcx.resolve_instance(tcx.param_env(our_func_def_id).and((our_func_def_id, generic_args))).unwrap().unwrap();
             // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
@@ -124,7 +145,11 @@ pub(crate) fn add_after_handler<'tcx>(
             //     const_: const_,
             //     user_ty: None,
             // }))
-            Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
+            if is_generic_func {
+                Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
+            } else {
+                Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
+            }
         };
 
         // 为了传入返回值，先构造一条创建引用的statement并插到我们的函数调用前
