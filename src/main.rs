@@ -1,8 +1,10 @@
 #![feature(rustc_private)]
 #![feature(box_patterns)]
 #![feature(rustc_attrs)]
+#![allow(rustc::untranslatable_diagnostic)]
+#![allow(rustc::diagnostic_outside_of_impl)]
 
-extern crate tracing;
+extern crate tracing; // share from rustc
 extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_hir;
@@ -19,11 +21,9 @@ use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
 use std::path::PathBuf;
 use std::env;
-use std::str::FromStr;
-use log::debug;
-
 mod mirpass;
 mod utils;
+use tracing::info;
 
 // inspired by lockbud & miri
 fn main() {
@@ -52,7 +52,7 @@ fn main() {
     // }
     if std::env::var_os("RUSTC_LOG").is_some() {
         rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
-        println!("init_logger from RUSTC_LOG");
+        info!("init_logger from RUSTC_LOG");
     }
 
     // Setting RUSTC_WRAPPER causes Cargo to pass 'rustc' as the first argument.
@@ -73,9 +73,27 @@ fn main() {
         // Tell compiler where to find the std library and so on.
         // The compiler relies on the standard rustc driver to tell it, so we have to do likewise.
         rustc_command_line_arguments.push(sysroot);
-        rustc_command_line_arguments.push(utils::find_sysroot());
+        let sysroot_path = utils::find_sysroot().unwrap_or_else(|| {
+            early_dcx.early_fatal("Could not find sysroot. Specify the RUST_SYSROOT environment variable, \
+            or use rustup to set the compiler to use for solcon_instrumenter");
+            "".into()
+        });
+        rustc_command_line_arguments.push(sysroot_path);
     }
 
+    // note must start with lib & end with .rlib(e.g lib*.rlib)
+    let solcon_monitor_function_lib_name = "this_is_our_monitor_function";
+    // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
+    let solcon_monitor_function_rlib_path = utils::find_our_monitor_lib().unwrap_or_else(|| {
+        early_dcx.early_fatal("solcon monitor function rlib not exist");
+        "".into()
+    });
+   // force make the monitor function become dependency of each crate & linked to each crate
+   // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L127
+   rustc_command_line_arguments.push("--extern".to_owned());
+   rustc_command_line_arguments.push(format!("force:{solcon_monitor_function_lib_name}={solcon_monitor_function_rlib_path}"));
+
+   
     let always_encode_mir: String = "always-encode-mir".into();
     if !rustc_command_line_arguments
         .iter()
@@ -102,6 +120,24 @@ fn main() {
         // Print mono items
         rustc_command_line_arguments.push("-Z".into());
         rustc_command_line_arguments.push("print_mono_items=lazy".into()); // or eager if needed, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
+
+    if !rustc_command_line_arguments
+        .iter()
+        .any(|arg| arg.starts_with(&"share-generics"))
+    {
+        // share-generics
+        rustc_command_line_arguments.push("-Z".into());
+        rustc_command_line_arguments.push("share-generics=y".into());
+    }
+
+
+    if !rustc_command_line_arguments
+        .iter()
+        .any(|arg| arg.starts_with(&"unstable-options"))
+    {
+        // the `-Z unstable-options` flag must also be passed to enable `--extern` options
+        rustc_command_line_arguments.push("-Z".into());
+        rustc_command_line_arguments.push("unstable-options".into());
     }
 
     // let link_dead_code: String = "link-dead-code".into();
@@ -116,7 +152,7 @@ fn main() {
 
     let mut callbacks = Callbacks::new();
     let result = rustc_driver::catch_fatal_errors( || {
-        debug!("rustc_command_line_arguments {:?}", rustc_command_line_arguments);
+        info!("rustc_command_line_arguments {:?}", rustc_command_line_arguments);
         let compiler = rustc_driver::RunCompiler::new(&rustc_command_line_arguments, &mut callbacks);
         compiler
         .set_using_internal_features(using_internal_features)
@@ -154,12 +190,12 @@ fn is_root<'tcx>(tcx: rustc_middle::ty::TyCtxt<'tcx>, def_id: rustc_hir::def_id:
 impl rustc_driver::Callbacks for Callbacks {
     fn config(&mut self, config: &mut rustc_interface::interface::Config) {
         self.file_name = config.input.source_name().prefer_remapped_unconditionaly().to_string();
+        info!("Processing input file: {}", self.file_name);
         for c in &config.crate_check_cfg {
-            println!("{c}");
+            info!("config.crate_check_cfg {c}");
         }
-        debug!("Processing input file: {}", self.file_name);
         if config.opts.test {
-            debug!("in test only mode");
+            info!("in test only mode");
             self.test_run = true;
         }
         match &config.output_dir {
@@ -170,6 +206,7 @@ impl rustc_driver::Callbacks for Callbacks {
             Some(path_buf) => self.output_directory.push(path_buf.as_path()),
         }
     }
+    
     fn after_analysis<'tcx>(
         &mut self,
         _compiler: &rustc_interface::interface::Compiler,
@@ -184,33 +221,43 @@ impl rustc_driver::Callbacks for Callbacks {
             // No need to analyze a build script, but do generate code.
             return Compilation::Continue;
         }
-        println!("Processing input file: {}", self.file_name);
+        info!("after_analysis input file: {}", self.file_name);
         let mut global_ctxt = queries.global_ctxt().unwrap();
         global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
+            let opts = &tcx.sess.opts;
+            let externs = &opts.externs;
+            for (str, extern_entry) in externs.iter() {
+                info!("externs {}, force={}", str, extern_entry.force);
+            }
+            if tcx.sess.dcx().has_errors_or_delayed_bugs().is_some() {
+                tcx.dcx().fatal("solcon_instrumenter cannot be run on programs that fail compilation");
+            }
+            tcx.dcx().abort_if_errors();
+
             for item_id in tcx.hir_crate_items(()).free_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    println!("free_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    info!("free_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             for item_id in tcx.hir_crate_items(()).trait_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    println!("trait_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    info!("trait_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             for item_id in tcx.hir_crate_items(()).impl_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    println!("impl_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    info!("impl_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             for item_id in tcx.hir_crate_items(()).foreign_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    println!("foreign_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    info!("foreign_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
-            // init_late_loggers
+            // init late loggers
             let early_dcx = EarlyDiagCtxt::new(tcx.sess.opts.error_format);
             if env::var_os("RUSTC_LOG").is_none() {
-                println!("init_logger");
+                info!("init late loggers");
                 rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
             }
 

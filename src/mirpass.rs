@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::trace;
+use tracing::{trace, info};
 use rustc_hir::definitions::DefPath;
 use rustc_hir::def_id::{CrateNum, DefId};
 use rustc_middle::mir::{*};

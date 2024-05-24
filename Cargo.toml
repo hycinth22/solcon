@@ -5,8 +5,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-log = "0.4.11"
-env_logger = "0.8.2"
 
 # Copied from `compiler/rustc/Cargo.toml`.
 # But only for some targets, it fails for others. Rustc configures this in its CI, but we can't

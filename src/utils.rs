@@ -5,6 +5,7 @@ use rustc_middle::mir::*;
 use rustc_span::DUMMY_SP;
 use rustc_span::def_id::{CrateNum, DefId};
 use rustc_hir::definitions::DefPath;
+use tracing::{trace, info};
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn jemalloc_magic() {
@@ -42,44 +43,56 @@ pub fn jemalloc_magic() {
     }
 }
 
-pub fn find_sysroot() -> String {
+pub fn find_sysroot() -> Option<String> {
     if let Some(sysroot) = option_env!("RUST_SYSROOT") {
-        return sysroot.to_owned();
+        return Some(sysroot.to_owned());
     }
     let home = option_env!("RUSTUP_HOME");
     let toolchain = option_env!("RUSTUP_TOOLCHAIN");
     if let (Some(home), Some(toolchain)) = (home, toolchain) {
-        return format!("{}/toolchains/{}", home, toolchain);
+        return Some(format!("{}/toolchains/{}", home, toolchain));
     }
     let out = std::process::Command::new("rustc").arg("--print=sysroot")
     .current_dir(".").output();
     if let Ok(out) = out {
         if out.status.success() {
             let sysroot = std::str::from_utf8(&out.stdout).unwrap().trim();
-            return sysroot.to_owned();
+            return Some(sysroot.to_owned());
         }
     }
-    panic!("Could not find sysroot. Specify the RUST_SYSROOT environment variable, \
-    or use rustup to set the compiler to use for solcon",)
+    None
 }
 
+pub fn find_our_monitor_lib() -> Option<String>  {
+    if let Some(path) = option_env!("SOLCON_MONITOR_LIB_PATH") {
+        return Some(path.to_owned());
+    }
+    let current_dir = env::current_dir().ok()?;
+    const lib_file_name :&str = "this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib";
+    let lib_file_path = current_dir.join(lib_file_name);
+    if lib_file_path.exists() {
+        return Some(String::from(lib_file_path.to_str()?));
+    }
+    info!("fail to find our monitor lib in {}", String::from(lib_file_path.to_str()?));
+    None
+}
 
 pub fn rustc_logger_config() -> rustc_log::LoggerConfig {
     // Start with the usual env vars.
     let mut cfg = rustc_log::LoggerConfig::from_env("RUSTC_LOG");
 
-    // Overwrite if MIRI_LOG is set.
+    // Overwrite if SOLCON_LOG is set.
     if let Ok(var) = env::var("SOLCON_LOG") {
-        // MIRI_LOG serves as default for RUSTC_LOG, if that is not set.
+        // SOLCON_LOG serves as default for RUSTC_LOG, if that is not set.
         if matches!(cfg.filter, Err(env::VarError::NotPresent)) {
             // We try to be a bit clever here: if `SOLCON_LOG` is just a single level
             // used for everything, we only apply it to the parts of rustc that are
             // CTFE-related. Otherwise, we use it verbatim for `RUSTC_LOG`.
-            // This way, if you set `MIRI_LOG=trace`, you get only the right parts of
-            // rustc traced, but you can also do `MIRI_LOG=miri=trace,rustc_const_eval::interpret=debug`.
+            // This way, if you set `SOLCON_LOG=trace`, you get only the right parts of
+            // rustc traced, but you can also do `SOLCON_LOG=miri=trace,rustc_const_eval::interpret=debug`.
             if tracing::Level::from_str(&var).is_ok() {
                 cfg.filter = Ok(format!(
-                    "rustc_middle::mir::interpret={var},rustc_const_eval::interpret={var},miri={var}" // todo
+                    "rustc_middle::mir::interpret={var},rustc_const_eval::interpret={var},solcon_instrumenter={var}" // todo
                 ));
             } else {
                 cfg.filter = Ok(var);
@@ -88,6 +101,18 @@ pub fn rustc_logger_config() -> rustc_log::LoggerConfig {
     }
 
     cfg
+}
+
+pub fn file_exist(file_path: &str) -> bool {
+    match std::fs::metadata(file_path) {
+        Ok(metadata) => {
+            // 检查元数据中的文件类型是否是一个文件
+            metadata.is_file()
+        },
+        Err(_) => {
+            false
+        }
+    }
 }
 
 pub fn is_crate_def_id(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
