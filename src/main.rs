@@ -4,6 +4,7 @@
 #![allow(rustc::untranslatable_diagnostic)]
 #![allow(rustc::diagnostic_outside_of_impl)]
 #![allow(internal_features)]
+#![allow(unused_imports)]
 
 extern crate tracing; // share from rustc
 extern crate rustc_data_structures;
@@ -83,16 +84,19 @@ fn main() {
     }
 
     // note must start with lib & end with .rlib(e.g lib*.rlib)
-    let solcon_monitor_function_lib_name = "this_is_our_monitor_function";
+    let solcon_monitor_function_lib_crate_name = "this_is_our_monitor_function";
     // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
-    let solcon_monitor_function_rlib_path = utils::find_our_monitor_lib().unwrap_or_else(|| {
+    let (solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath) = utils::find_our_monitor_lib().unwrap_or_else(|| {
         early_dcx.early_fatal("solcon monitor function rlib not exist");
-        "".into()
+        ("".into(), "".into())
     });
    // force make the monitor function become dependency of each crate & linked to each crate
    // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L127
    rustc_command_line_arguments.push("--extern".to_owned());
-   rustc_command_line_arguments.push(format!("force:{solcon_monitor_function_lib_name}={solcon_monitor_function_rlib_path}"));
+   rustc_command_line_arguments.push(format!("force:{solcon_monitor_function_lib_crate_name}={solcon_monitor_function_rlib_filepath}"));
+   
+   rustc_command_line_arguments.push("-L".to_owned());
+   rustc_command_line_arguments.push(solcon_monitor_function_rlib_dirpath);
 
    
     let always_encode_mir: String = "always-encode-mir".into();
@@ -120,7 +124,7 @@ fn main() {
     {
         // Print mono items
         rustc_command_line_arguments.push("-Z".into());
-        rustc_command_line_arguments.push("print_mono_items=lazy".into()); // or eager if needed, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
+        rustc_command_line_arguments.push("print_mono_items=eager".into()); // or eager if needed, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
     }
 
     if !rustc_command_line_arguments

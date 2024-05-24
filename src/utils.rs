@@ -1,4 +1,5 @@
 use std::env;
+use std::path::Path;
 use std::str::FromStr;
 use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
 use rustc_middle::mir::*;
@@ -63,17 +64,22 @@ pub fn find_sysroot() -> Option<String> {
     None
 }
 
-pub fn find_our_monitor_lib() -> Option<String>  {
-    if let Some(path) = option_env!("SOLCON_MONITOR_LIB_PATH") {
-        return Some(path.to_owned());
+fn get_parent_path(path: &str) -> Option<String> {
+    let parent_path = Path::new(path).parent()?.to_str()?;
+    Some(parent_path.into())
+}
+
+pub fn find_our_monitor_lib() -> Option<(String, String)>  {
+    if let Some(lib_path) = option_env!("SOLCON_MONITOR_LIB_PATH") {
+        return Some((lib_path.to_owned(), get_parent_path(lib_path)?));
     }
     let current_dir = env::current_dir().ok()?;
     const lib_file_name :&str = "this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib";
     let lib_file_path = current_dir.join(lib_file_name);
     if lib_file_path.exists() {
-        return Some(String::from(lib_file_path.to_str()?));
+        return Some((String::from(lib_file_path.to_str()?), get_parent_path(lib_file_path.to_str()?)?));
     }
-    info!("fail to find our monitor lib in {}", String::from(lib_file_path.to_str()?));
+    info!("fail to find our monitor lib {}", String::from(lib_file_path.to_str()?));
     None
 }
 
