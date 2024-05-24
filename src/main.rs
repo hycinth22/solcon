@@ -96,7 +96,7 @@ fn main() {
    rustc_command_line_arguments.push(format!("force:{solcon_monitor_function_lib_crate_name}={solcon_monitor_function_rlib_filepath}"));
    
    rustc_command_line_arguments.push("-L".to_owned());
-   rustc_command_line_arguments.push(solcon_monitor_function_rlib_dirpath);
+   rustc_command_line_arguments.push(format!("dependency={solcon_monitor_function_rlib_dirpath}"));
 
    
     let always_encode_mir: String = "always-encode-mir".into();
