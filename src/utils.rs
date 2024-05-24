@@ -45,7 +45,7 @@ pub fn jemalloc_magic() {
 }
 
 pub fn find_sysroot() -> Option<String> {
-    if let Some(sysroot) = option_env!("RUST_SYSROOT") {
+    if let Some(sysroot) = option_env!("RUST_SYSROOT") { // notice: complied-time env value
         return Some(sysroot.to_owned());
     }
     let home = option_env!("RUSTUP_HOME");
@@ -70,8 +70,10 @@ fn get_parent_path(path: &str) -> Option<String> {
 }
 
 pub fn find_our_monitor_lib() -> Option<(String, String)>  {
-    if let Some(lib_path) = option_env!("SOLCON_MONITOR_LIB_PATH") {
-        return Some((lib_path.to_owned(), get_parent_path(lib_path)?));
+    if let Ok(lib_path) = env::var("SOLCON_MONITOR_LIB_PATH") {
+        info!("find env SOLCON_MONITOR_LIB_PATH: {}", lib_path);
+        let dir_path = get_parent_path(lib_path.as_str())?;
+        return Some((lib_path, dir_path));
     }
     let current_dir = env::current_dir().ok()?;
     const lib_file_name :&str = "this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib";
