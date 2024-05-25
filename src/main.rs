@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::env;
 mod mirpass;
 mod utils;
-use tracing::info;
+use tracing::{info, trace};
 
 // inspired by lockbud & miri
 fn main() {
@@ -242,22 +242,22 @@ impl rustc_driver::Callbacks for Callbacks {
 
             for item_id in tcx.hir_crate_items(()).free_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    info!("free_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    trace!("free_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             for item_id in tcx.hir_crate_items(()).trait_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    info!("trait_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    trace!("trait_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             for item_id in tcx.hir_crate_items(()).impl_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    info!("impl_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    trace!("impl_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             for item_id in tcx.hir_crate_items(()).foreign_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
-                    info!("foreign_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
+                    trace!("foreign_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
             // init late loggers

@@ -153,23 +153,23 @@ pub fn get_operand_ty<'tcx>(local_decls: &rustc_index::IndexVec<Local, LocalDecl
         Operand::Constant(box ConstOperand { const_, .. }) => {
             match const_ {
                 Const::Ty( ty_const) => {
-                    //println!("ty!!");
+                    //trace!("ty!!");
                     return ty_const.ty();
                 }
                 Const::Unevaluated(_val, ty) => {
-                    //println!("Unevaluated!!");
+                    //trace!("Unevaluated!!");
                     return ty.clone();
                 }
                 Const::Val( _val, ty) => {
                     //dbg!(_val);
-                    //println!("Val!!");
+                    //trace!("Val!!");
                     return ty.clone();
                 }
             }
         }
         Operand::Copy(place) | Operand::Move(place) => {
             let ty = local_decls[place.local].ty;
-            // println!("Copy | Move !!");
+            // trace!("Copy | Move !!");
             return ty;
         }
     }
@@ -182,7 +182,7 @@ pub fn get_function_generic_args_from_ty<'tcx>(ty: &ty::Ty<'tcx>) -> Option<&'tc
             return Some(&args);
         }
         ty::FnPtr(_) => {
-            println!("get_function_args_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
+            info!("get_function_args_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
         },
         ty::TyKind::Dynamic(_, _, _) => todo!(),
         ty::TyKind::CoroutineClosure(_, _) => todo!(),
@@ -211,7 +211,7 @@ pub fn get_function_generic_args_from_ty<'tcx>(ty: &ty::Ty<'tcx>) -> Option<&'tc
         ty::TyKind::Infer(_) => todo!(),
         ty::TyKind::Error(_) => todo!(),
     }
-    println!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
+    info!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
     None
 }
 
@@ -221,12 +221,12 @@ pub fn get_function_path_str_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>)
         ty::TyKind::FnDef(def_id, _args) | ty::Closure(def_id, _args) => {
             //let func_def_path_str_with_args = tcx.def_path_str_with_args(def_id, _args);
             //dbg!(_args);
-            //println!("get_function_path_str_from_ty func_def_path_str_with_args: {}", func_def_path_str_with_args);
+            //debug!("get_function_path_str_from_ty func_def_path_str_with_args: {}", func_def_path_str_with_args);
             let func_def_path_str = tcx.def_path_str(*def_id);
             return Some(func_def_path_str);
         }
         ty::FnPtr(_) => {
-            println!("get_function_path_str_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
+            info!("get_function_path_str_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
         },
         ty::TyKind::Dynamic(_, _, _) => todo!(),
         ty::TyKind::CoroutineClosure(_, _) => todo!(),
@@ -255,7 +255,7 @@ pub fn get_function_path_str_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>)
         ty::TyKind::Infer(_) => todo!(),
         ty::TyKind::Error(_) => todo!(),
     }
-    println!("get_function_path_str_from_ty: failed!!!!!!!!!!!!!!");
+    info!("get_function_path_str_from_ty: failed!!!!!!!!!!!!!!");
     None
 }
 
@@ -266,12 +266,12 @@ pub fn get_function_path_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>) -> 
         ty::TyKind::FnDef(def_id, _args) | ty::Closure(def_id, _args) => {
             //let func_def_path_str_with_args = tcx.def_path_str_with_args(def_id, _args);
             //dbg!(_args);
-            //println!("get_function_path_str_from_ty func_def_path_str_with_args: {}", func_def_path_str_with_args);
+            //debug!("get_function_path_str_from_ty func_def_path_str_with_args: {}", func_def_path_str_with_args);
             let def_path = tcx.def_path(def_id.clone());
             return Some(def_path);
         }
         ty::FnPtr(_) => {
-            println!("get_function_path_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
+            info!("get_function_path_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
         },
         ty::TyKind::Dynamic(_, _, _) => todo!(),
         ty::TyKind::CoroutineClosure(_, _) => todo!(),
@@ -300,7 +300,7 @@ pub fn get_function_path_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>) -> 
         ty::TyKind::Infer(_) => todo!(),
         ty::TyKind::Error(_) => todo!(),
     }
-    println!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
+    info!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
     None
 }
 
