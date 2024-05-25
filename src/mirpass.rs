@@ -282,7 +282,7 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
             if func_def_path_str.ends_with("::this_is_our_test_target_mod::this_is_our_test_target_function") {
                 info!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
                 if let Some(before_fn) = prescan_info.test_target_before_fn {
-                    info("instrumenting target_before at {}", func_def_path_str);
+                    info!("instrumenting target_before at {}", func_def_path_str);
                     let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
                     insert_before_call.extend(insertblocks);
                 } else {
