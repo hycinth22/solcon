@@ -76,8 +76,8 @@ pub fn find_our_monitor_lib() -> Option<(String, String)>  {
         return Some((lib_path, dir_path));
     }
     let current_dir = env::current_dir().ok()?;
-    const lib_file_name :&str = "this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib";
-    let lib_file_path = current_dir.join(lib_file_name);
+    const LIB_FILE_NAME :&str = "this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib";
+    let lib_file_path = current_dir.join(LIB_FILE_NAME);
     if lib_file_path.exists() {
         return Some((String::from(lib_file_path.to_str()?), get_parent_path(lib_file_path.to_str()?)?));
     }

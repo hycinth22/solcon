@@ -5,6 +5,9 @@
 #![allow(rustc::diagnostic_outside_of_impl)]
 #![allow(internal_features)]
 #![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
+#![allow(unused_mut)]
 
 extern crate tracing; // share from rustc
 extern crate rustc_data_structures;
@@ -75,21 +78,20 @@ fn main() {
         // Tell compiler where to find the std library and so on.
         // The compiler relies on the standard rustc driver to tell it, so we have to do likewise.
         rustc_command_line_arguments.push(sysroot);
-        let sysroot_path = utils::find_sysroot().unwrap_or_else(|| {
+        let Some(sysroot_path) = utils::find_sysroot() else {
             early_dcx.early_fatal("Could not find sysroot. Specify the RUST_SYSROOT environment variable, \
             or use rustup to set the compiler to use for solcon_instrumenter");
-            "".into()
-        });
+        };
         rustc_command_line_arguments.push(sysroot_path);
     }
 
     // note must start with lib & end with .rlib(e.g lib*.rlib)
     let solcon_monitor_function_lib_crate_name = "this_is_our_monitor_function";
     // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
-    let (solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath) = utils::find_our_monitor_lib().unwrap_or_else(|| {
+    let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = utils::find_our_monitor_lib() else {
         early_dcx.early_fatal("solcon monitor function rlib not exist");
-        ("".into(), "".into())
-    });
+    };
+    //let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = (solcon_monitor_function_rlib_filepath.unwrap(), solcon_monitor_function_rlib_dirpath.unwrap());
    // force make the monitor function become dependency of each crate & linked to each crate
    // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L127
    rustc_command_line_arguments.push("--extern".to_owned());
