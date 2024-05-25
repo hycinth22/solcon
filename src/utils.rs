@@ -178,47 +178,73 @@ pub fn get_operand_ty<'tcx>(local_decls: &rustc_index::IndexVec<Local, LocalDecl
 pub fn get_function_generic_args_from_ty<'tcx>(ty: &ty::Ty<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
     let ty_kind: &rustc_type_ir::TyKind<TyCtxt> = ty.kind();
     match ty_kind {
-        ty::TyKind::FnDef(_def_id, args) | ty::Closure(_def_id, args) => {
+        ty::TyKind::FnDef(def_id, args) // // The anonymous type of a function declaration/definition
+        | ty::Closure(def_id, args) // // The anonymous type of a closure. Used to represent the type of |a| a.
+        | ty::TyKind::CoroutineClosure(def_id, args)  // The anonymous type of a closure. Used to represent the type of async |a| a.
+        | ty::TyKind::Coroutine(def_id, args) // The anonymous type of a coroutine. Used to represent the type of |a| yield a.
+        => {
             return Some(&args);
         }
         ty::FnPtr(_) => {
-            info!("get_function_args_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
+            info!("get_function_generic_args_from_ty failed: we cannot infer FnPtr point to what");   
         },
-        ty::TyKind::Dynamic(_, _, _) => todo!(),
-        ty::TyKind::CoroutineClosure(_, _) => todo!(),
-        ty::TyKind::Coroutine(_, _) => unimplemented!(),
-        ty::TyKind::CoroutineWitness(_, _) => todo!(),
-        // the following all looks unlikely, but remains different branchs for debug
-        ty::TyKind::Bool => todo!(),
-        ty::TyKind::Char => todo!(),
-        ty::TyKind::Int(_) => todo!(),
-        ty::TyKind::Uint(_) => todo!(),
-        ty::TyKind::Float(_) => todo!(),
-        ty::TyKind::Adt(_, _) => todo!(),
-        ty::TyKind::Foreign(_) => todo!(),
-        ty::TyKind::Str => todo!(),
-        ty::TyKind::Array(_, _) => todo!(),
-        ty::TyKind::Pat(_, _) => todo!(),
-        ty::TyKind::Slice(_) => todo!(),
-        ty::TyKind::RawPtr(_, _) => todo!(),
-        ty::TyKind::Ref(_, _, _) => todo!(),
-        ty::TyKind::Never => todo!(),
-        ty::TyKind::Tuple(_) => todo!(),
-        ty::TyKind::Alias(_, _) => todo!(),
-        ty::TyKind::Param(_) => todo!(),
-        ty::TyKind::Bound(_, _) => todo!(),
-        ty::TyKind::Placeholder(_) => todo!(),
-        ty::TyKind::Infer(_) => todo!(),
-        ty::TyKind::Error(_) => todo!(),
+        // A trait object. Written as dyn for<'b> Trait<'b, Assoc = u32> + Send + 'a.
+        ty::TyKind::Dynamic(_, _, _) => unimplemented!(),
+        // A placeholder for a type which could not be computed; this is propagated to avoid useless error messages.
+        ty::TyKind::Error(_) => {
+            return None;
+        },
+        // the following all types looks unlikely because uncallable, but remains their different branchs for debug
+        ty::TyKind::Bool => unreachable!(),
+        ty::TyKind::Char => unreachable!(),
+        ty::TyKind::Int(_) => unreachable!(),
+        ty::TyKind::Uint(_) => unreachable!(),
+        ty::TyKind::Float(_) => unreachable!(),
+        // Algebraic data types (ADT). For example: structures, enumerations and unions.
+        ty::TyKind::Adt(_, _) => unreachable!(),
+        // An unsized FFI type that is opaque to Rust. Written as extern type T.
+        ty::TyKind::Foreign(_) => unreachable!(),
+        // The pointee of a string slice. Written as str.
+        ty::TyKind::Str => unreachable!(),
+        // An array with the given length. Written as [T; N].
+        ty::TyKind::Array(_, _) => unreachable!(),
+        // A pattern newtype.  Only supports integer range patterns for now.
+        ty::TyKind::Pat(_, _) => unreachable!(),
+        // The pointee of an array slice. Written as [T]
+        ty::TyKind::Slice(_) => unreachable!(),
+        // A raw pointer. Written as *mut T or *const T
+        ty::TyKind::RawPtr(_, _) => unreachable!(),
+        // A reference; a pointer with an associated lifetime. Written as &'a mut T or &'a T.
+        ty::TyKind::Ref(_, _, _) => unreachable!(),
+        // A type representing the types stored inside a coroutine. This should only appear as part of the CoroutineArgs.
+        ty::TyKind::CoroutineWitness(_, _) => unreachable!(),
+        // The never type !.
+        ty::TyKind::Never => unreachable!(),
+        // A tuple type. For example, (i32, bool).
+        ty::TyKind::Tuple(_) => unreachable!(),
+        // A projection, opaque type, weak type alias, or inherent associated type.
+        ty::TyKind::Alias(_, _) => unreachable!(),
+        // A type parameter; for example, T in fn f<T>(x: T) {}.
+        ty::TyKind::Param(_) => unreachable!(),
+        // Bound type variable, used to represent the 'a in for<'a> fn(&'a ()).
+        ty::TyKind::Bound(_, _) => unreachable!(),
+        // A placeholder type, used during higher ranked subtyping to instantiate bound variables.
+        ty::TyKind::Placeholder(_) => unreachable!(),
+        // A type variable used during type checking.
+        ty::TyKind::Infer(_) => unreachable!(),
     }
-    info!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
+    info!("get_function_generic_args_from_ty: failed!!!!!!!!!!!!!!");
     None
 }
 
 pub fn get_function_path_str_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>) -> Option<String> {
     let ty_kind = ty.kind();
     match ty_kind {
-        ty::TyKind::FnDef(def_id, _args) | ty::Closure(def_id, _args) => {
+        ty::TyKind::FnDef(def_id, _args) // // The anonymous type of a function declaration/definition
+        | ty::Closure(def_id, _args) // // The anonymous type of a closure. Used to represent the type of |a| a.
+        | ty::TyKind::CoroutineClosure(def_id, _args)  // The anonymous type of a closure. Used to represent the type of async |a| a.
+        | ty::TyKind::Coroutine(def_id, _args) // The anonymous type of a coroutine. Used to represent the type of |a| yield a.
+        => {
             //let func_def_path_str_with_args = tcx.def_path_str_with_args(def_id, _args);
             //dbg!(_args);
             //debug!("get_function_path_str_from_ty func_def_path_str_with_args: {}", func_def_path_str_with_args);
@@ -226,34 +252,52 @@ pub fn get_function_path_str_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>)
             return Some(func_def_path_str);
         }
         ty::FnPtr(_) => {
-            info!("get_function_path_str_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
+            info!("get_function_path_str_from_ty failed: we cannot infer FnPtr point to what");   
         },
-        ty::TyKind::Dynamic(_, _, _) => todo!(),
-        ty::TyKind::CoroutineClosure(_, _) => todo!(),
-        ty::TyKind::Coroutine(_, _) => unimplemented!(),
-        ty::TyKind::CoroutineWitness(_, _) => todo!(),
-        // the following all looks unlikely, but remains different branchs for debug
-        ty::TyKind::Bool => todo!(),
-        ty::TyKind::Char => todo!(),
-        ty::TyKind::Int(_) => todo!(),
-        ty::TyKind::Uint(_) => todo!(),
-        ty::TyKind::Float(_) => todo!(),
-        ty::TyKind::Adt(_, _) => todo!(),
-        ty::TyKind::Foreign(_) => todo!(),
-        ty::TyKind::Str => todo!(),
-        ty::TyKind::Array(_, _) => todo!(),
-        ty::TyKind::Pat(_, _) => todo!(),
-        ty::TyKind::Slice(_) => todo!(),
-        ty::TyKind::RawPtr(_, _) => todo!(),
-        ty::TyKind::Ref(_, _, _) => todo!(),
-        ty::TyKind::Never => todo!(),
-        ty::TyKind::Tuple(_) => todo!(),
-        ty::TyKind::Alias(_, _) => todo!(),
-        ty::TyKind::Param(_) => todo!(),
-        ty::TyKind::Bound(_, _) => todo!(),
-        ty::TyKind::Placeholder(_) => todo!(),
-        ty::TyKind::Infer(_) => todo!(),
-        ty::TyKind::Error(_) => todo!(),
+        // A trait object. Written as dyn for<'b> Trait<'b, Assoc = u32> + Send + 'a.
+        ty::TyKind::Dynamic(_, _, _) => unimplemented!(),
+        // A placeholder for a type which could not be computed; this is propagated to avoid useless error messages.
+        ty::TyKind::Error(_) => {
+            return None;
+        },
+        // the following all types looks unlikely because uncallable, but remains their different branchs for debug
+        ty::TyKind::Bool => unreachable!(),
+        ty::TyKind::Char => unreachable!(),
+        ty::TyKind::Int(_) => unreachable!(),
+        ty::TyKind::Uint(_) => unreachable!(),
+        ty::TyKind::Float(_) => unreachable!(),
+        // Algebraic data types (ADT). For example: structures, enumerations and unions.
+        ty::TyKind::Adt(_, _) => unreachable!(),
+        // An unsized FFI type that is opaque to Rust. Written as extern type T.
+        ty::TyKind::Foreign(_) => unreachable!(),
+        // The pointee of a string slice. Written as str.
+        ty::TyKind::Str => unreachable!(),
+        // An array with the given length. Written as [T; N].
+        ty::TyKind::Array(_, _) => unreachable!(),
+        // A pattern newtype.  Only supports integer range patterns for now.
+        ty::TyKind::Pat(_, _) => unreachable!(),
+        // The pointee of an array slice. Written as [T]
+        ty::TyKind::Slice(_) => unreachable!(),
+        // A raw pointer. Written as *mut T or *const T
+        ty::TyKind::RawPtr(_, _) => unreachable!(),
+        // A reference; a pointer with an associated lifetime. Written as &'a mut T or &'a T.
+        ty::TyKind::Ref(_, _, _) => unreachable!(),
+        // A type representing the types stored inside a coroutine. This should only appear as part of the CoroutineArgs.
+        ty::TyKind::CoroutineWitness(_, _) => unreachable!(),
+        // The never type !.
+        ty::TyKind::Never => unreachable!(),
+        // A tuple type. For example, (i32, bool).
+        ty::TyKind::Tuple(_) => unreachable!(),
+        // A projection, opaque type, weak type alias, or inherent associated type.
+        ty::TyKind::Alias(_, _) => unreachable!(),
+        // A type parameter; for example, T in fn f<T>(x: T) {}.
+        ty::TyKind::Param(_) => unreachable!(),
+        // Bound type variable, used to represent the 'a in for<'a> fn(&'a ()).
+        ty::TyKind::Bound(_, _) => unreachable!(),
+        // A placeholder type, used during higher ranked subtyping to instantiate bound variables.
+        ty::TyKind::Placeholder(_) => unreachable!(),
+        // A type variable used during type checking.
+        ty::TyKind::Infer(_) => unreachable!(),
     }
     info!("get_function_path_str_from_ty: failed!!!!!!!!!!!!!!");
     None
@@ -263,7 +307,11 @@ pub fn get_function_path_str_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>)
 pub fn get_function_path_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>) -> Option<DefPath> {
     let ty_kind = ty.kind();
     match ty_kind {
-        ty::TyKind::FnDef(def_id, _args) | ty::Closure(def_id, _args) => {
+        ty::TyKind::FnDef(def_id, _args) // // The anonymous type of a function declaration/definition
+        | ty::Closure(def_id, _args) // // The anonymous type of a closure. Used to represent the type of |a| a.
+        | ty::TyKind::CoroutineClosure(def_id, _args)  // The anonymous type of a closure. Used to represent the type of async |a| a.
+        | ty::TyKind::Coroutine(def_id, _args) // The anonymous type of a coroutine. Used to represent the type of |a| yield a.
+        => {
             //let func_def_path_str_with_args = tcx.def_path_str_with_args(def_id, _args);
             //dbg!(_args);
             //debug!("get_function_path_str_from_ty func_def_path_str_with_args: {}", func_def_path_str_with_args);
@@ -271,34 +319,52 @@ pub fn get_function_path_from_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: &ty::Ty<'tcx>) -> 
             return Some(def_path);
         }
         ty::FnPtr(_) => {
-            info!("get_function_path_from_ty: FnPtr failed!!!!!!!!!!!!!!");   
+            info!("get_function_path_from_ty failed: we cannot infer FnPtr point to what");   
         },
-        ty::TyKind::Dynamic(_, _, _) => todo!(),
-        ty::TyKind::CoroutineClosure(_, _) => todo!(),
-        ty::TyKind::Coroutine(_, _) => unimplemented!(),
-        ty::TyKind::CoroutineWitness(_, _) => todo!(),
-        // the following all looks unlikely, but remains different branchs for debug
-        ty::TyKind::Bool => todo!(),
-        ty::TyKind::Char => todo!(),
-        ty::TyKind::Int(_) => todo!(),
-        ty::TyKind::Uint(_) => todo!(),
-        ty::TyKind::Float(_) => todo!(),
-        ty::TyKind::Adt(_, _) => todo!(),
-        ty::TyKind::Foreign(_) => todo!(),
-        ty::TyKind::Str => todo!(),
-        ty::TyKind::Array(_, _) => todo!(),
-        ty::TyKind::Pat(_, _) => todo!(),
-        ty::TyKind::Slice(_) => todo!(),
-        ty::TyKind::RawPtr(_, _) => todo!(),
-        ty::TyKind::Ref(_, _, _) => todo!(),
-        ty::TyKind::Never => todo!(),
-        ty::TyKind::Tuple(_) => todo!(),
-        ty::TyKind::Alias(_, _) => todo!(),
-        ty::TyKind::Param(_) => todo!(),
-        ty::TyKind::Bound(_, _) => todo!(),
-        ty::TyKind::Placeholder(_) => todo!(),
-        ty::TyKind::Infer(_) => todo!(),
-        ty::TyKind::Error(_) => todo!(),
+        // A trait object. Written as dyn for<'b> Trait<'b, Assoc = u32> + Send + 'a.
+        ty::TyKind::Dynamic(_, _, _) => unimplemented!(),
+        // A placeholder for a type which could not be computed; this is propagated to avoid useless error messages.
+        ty::TyKind::Error(_) => {
+            return None;
+        },
+        // the following all types looks unlikely because uncallable, but remains their different branchs for debug
+        ty::TyKind::Bool => unreachable!(),
+        ty::TyKind::Char => unreachable!(),
+        ty::TyKind::Int(_) => unreachable!(),
+        ty::TyKind::Uint(_) => unreachable!(),
+        ty::TyKind::Float(_) => unreachable!(),
+        // Algebraic data types (ADT). For example: structures, enumerations and unions.
+        ty::TyKind::Adt(_, _) => unreachable!(),
+        // An unsized FFI type that is opaque to Rust. Written as extern type T.
+        ty::TyKind::Foreign(_) => unreachable!(),
+        // The pointee of a string slice. Written as str.
+        ty::TyKind::Str => unreachable!(),
+        // An array with the given length. Written as [T; N].
+        ty::TyKind::Array(_, _) => unreachable!(),
+        // A pattern newtype.  Only supports integer range patterns for now.
+        ty::TyKind::Pat(_, _) => unreachable!(),
+        // The pointee of an array slice. Written as [T]
+        ty::TyKind::Slice(_) => unreachable!(),
+        // A raw pointer. Written as *mut T or *const T
+        ty::TyKind::RawPtr(_, _) => unreachable!(),
+        // A reference; a pointer with an associated lifetime. Written as &'a mut T or &'a T.
+        ty::TyKind::Ref(_, _, _) => unreachable!(),
+        // A type representing the types stored inside a coroutine. This should only appear as part of the CoroutineArgs.
+        ty::TyKind::CoroutineWitness(_, _) => unreachable!(),
+        // The never type !.
+        ty::TyKind::Never => unreachable!(),
+        // A tuple type. For example, (i32, bool).
+        ty::TyKind::Tuple(_) => unreachable!(),
+        // A projection, opaque type, weak type alias, or inherent associated type.
+        ty::TyKind::Alias(_, _) => unreachable!(),
+        // A type parameter; for example, T in fn f<T>(x: T) {}.
+        ty::TyKind::Param(_) => unreachable!(),
+        // Bound type variable, used to represent the 'a in for<'a> fn(&'a ()).
+        ty::TyKind::Bound(_, _) => unreachable!(),
+        // A placeholder type, used during higher ranked subtyping to instantiate bound variables.
+        ty::TyKind::Placeholder(_) => unreachable!(),
+        // A type variable used during type checking.
+        ty::TyKind::Infer(_) => unreachable!(),
     }
     info!("get_function_path_from_ty: failed!!!!!!!!!!!!!!");
     None
