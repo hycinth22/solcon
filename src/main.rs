@@ -30,6 +30,7 @@ use rustc_middle::mir::mono::MonoItem;
 use std::path::PathBuf;
 use std::env;
 
+mod check_input;
 mod mirpass;
 mod utils;
 
@@ -219,6 +220,7 @@ impl rustc_driver::Callbacks for Callbacks {
         info!("after_analysis input file: {}", self.file_name);
         let mut global_ctxt = queries.global_ctxt().unwrap();
         global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
+            info!("entering input file: {}", self.file_name);
             let dcx = tcx.dcx();
             let opts = &tcx.sess.opts;
             let externs = &opts.externs;
@@ -260,25 +262,26 @@ impl rustc_driver::Callbacks for Callbacks {
                 }
             }
 
-            // If `SOLCON_BACKTRACE` is set and `RUSTC_CTFE_BACKTRACE` is not, set `RUSTC_CTFE_BACKTRACE`.
-            // Do this late, so we ideally only apply this to SOLCON's errors.
-            if let Some(val) = env::var_os("SOLCON_BACKTRACE") {
-                let ctfe_backtrace = match &*val.to_string_lossy() {
-                    "immediate" => rustc_session::CtfeBacktrace::Immediate,
-                    "0" => rustc_session::CtfeBacktrace::Disabled,
-                    _ => rustc_session::CtfeBacktrace::Capture,
-                };
-                *tcx.sess.ctfe_backtrace.borrow_mut() = ctfe_backtrace;
-            }
-
+            // Pre-check
             if dcx.has_errors_or_delayed_bugs().is_some() {
                 dcx.fatal("solcon_instructmenter cannot be run on programs that fail compilation");
             }
             if tcx.sess.mir_opt_level() > 0 {
                 dcx.warn("Notice: You have explicitly enabled MIR optimizations!");
             }
+
+            // Check
+            if !check_input::should_process(tcx) {
+                dcx.note(format!("skip to instrument compiling unit {}, because should_process report false", self.file_name));
+                return;
+            }
+            dcx.abort_if_errors();
+
+            // Transform
             mirpass::run_our_pass(tcx);
             dcx.abort_if_errors();
+
+            // Build
             let (items, cgus) = tcx.collect_and_partition_mono_items(());
             info!("cgus.len {}", cgus.len());
             let instances: Vec<Instance<'tcx>> = cgus

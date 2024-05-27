@@ -174,12 +174,6 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
     false
 }
 
-fn is_target_crate(tcx: TyCtxt<'_>, krate: &CrateNum, target_crates: &[&str]) -> bool {
-    let crate_name = tcx.crate_name(*krate);
-    let crate_name_str = crate_name.as_str();
-    target_crates.contains(&crate_name_str)
-}
-
 fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_info: &search_monitor::PreScanInfo) {
     // 遍历基本块
     let bbs = body.basic_blocks.as_mut();
