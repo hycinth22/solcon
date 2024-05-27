@@ -39,26 +39,29 @@ fn main() {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     utils::jemalloc_magic();
 
-    // Initialize early diagnostics context
-    let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
-
     // Snapshot a copy of the environment before `rustc` starts messing with it.
     // (`install_ice_hook` might change `RUST_BACKTRACE`.)
     let _env_snapshot = std::env::vars_os().collect::<Vec<_>>();
 
-    let mut args = rustc_driver::args::raw_args(&early_dcx).unwrap_or_else(|_| std::process::exit(rustc_driver::EXIT_FAILURE));
-    assert!(!args.is_empty());
+    // Add an ICE hook.
+    let using_internal_features = rustc_driver::install_ice_hook("internal complier error", |_| ());
     
     // Install the ctrlc handler that sets `rustc_const_eval::CTRL_C_RECEIVED`
     rustc_driver::install_ctrlc_handler();
 
-    // Add an ICE hook.
-    let using_internal_features = rustc_driver::install_ice_hook("internal complier error", |_| ());
+    // Initialize early diagnostics context
+    let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
+
+    // Check & collect arguments
+    let mut args = rustc_driver::args::raw_args(&early_dcx).unwrap_or_else(|_| std::process::exit(rustc_driver::EXIT_FAILURE));
+    assert!(!args.is_empty());
 
     // Initialize loggers.
+    let mut logger_inited = false;
     if std::env::var_os("RUSTC_LOG").is_some() {
         rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config()); // similar to rustc_driver::init_rustc_env_logger(&early_dcx), but init_rustc_env_logger use environment variable
         info!("init_logger from RUSTC_LOG");
+        logger_inited = true;
     }
 
     // Setting RUSTC_WRAPPER causes Cargo to pass 'rustc' as the first argument.
@@ -81,7 +84,7 @@ fn main() {
         rustc_command_line_arguments.push(sysroot);
         let Some(sysroot_path) = utils::find_sysroot() else {
             early_dcx.early_fatal("Could not find sysroot. Specify the RUST_SYSROOT environment variable, \
-            or use rustup to set the compiler to use for solcon_instrumenter");
+            or use rustup to set the compiler to use for solcon_instrumenter")
         };
         rustc_command_line_arguments.push(sysroot_path);
     }
@@ -90,7 +93,7 @@ fn main() {
     let solcon_monitor_function_lib_crate_name = "this_is_our_monitor_function";
     // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
     let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = utils::find_our_monitor_lib() else {
-        early_dcx.early_fatal("solcon monitor function rlib not exist");
+        early_dcx.early_fatal("solcon monitor function rlib not exist")
     };
 
    // forcely make our monitor lib become dependency of each crate & linked to each crate
@@ -140,7 +143,7 @@ fn main() {
         rustc_command_line_arguments.push("unstable-options".into());
     }
 
-    let mut callbacks = Callbacks::new();
+    let mut callbacks = Callbacks::new(!logger_inited);
     let result = rustc_driver::catch_fatal_errors( || {
         info!("rustc_command_line_arguments {:?}", rustc_command_line_arguments.join(" "));
         let compiler = rustc_driver::RunCompiler::new(&rustc_command_line_arguments, &mut callbacks);
@@ -158,14 +161,16 @@ fn main() {
 
 
 struct Callbacks {
+    need_init_logger: bool,
     file_name: String,
     output_directory: PathBuf,
     test_run: bool,
 }
 
 impl Callbacks {
-    pub fn new() -> Self {
+    pub fn new(need_init_logger: bool) -> Self {
         Self {
+            need_init_logger,
             file_name: String::new(),
             output_directory: PathBuf::default(),
             test_run: false,
@@ -245,11 +250,14 @@ impl rustc_driver::Callbacks for Callbacks {
                     trace!("foreign_items Function: {}, isroot={}", tcx.def_path_str(item_id.owner_id.def_id), is_root(tcx, item_id.owner_id.def_id));
                 }
             }
-            // init late loggers
-            let early_dcx = EarlyDiagCtxt::new(tcx.sess.opts.error_format);
-            if env::var_os("RUSTC_LOG").is_none() {
-                info!("init late loggers");
-                rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
+
+            // init late logger
+            if self.need_init_logger {
+                let early_dcx = EarlyDiagCtxt::new(tcx.sess.opts.error_format);
+                if env::var_os("RUSTC_LOG").is_none() {
+                    info!("init late loggers");
+                    rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
+                }
             }
 
             // If `SOLCON_BACKTRACE` is set and `RUSTC_CTFE_BACKTRACE` is not, set `RUSTC_CTFE_BACKTRACE`.
