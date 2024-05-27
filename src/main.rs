@@ -115,35 +115,25 @@ fn main() {
         .iter()
         .any(|arg| arg.starts_with(&"mir-opt-level"))
     {
-        // Tell compiler to generate non optimized mir
+        // Tell compiler to generate non optimized builds
         rustc_command_line_arguments.push("-Z".into());
         rustc_command_line_arguments.push("mir-opt-level=0".into());
     }
 
-    // if !rustc_command_line_arguments
-    //     .iter()
-    //     .any(|arg| arg.starts_with(&"print_mono_items"))
-    // {
-    //     // Print mono items
-    //     rustc_command_line_arguments.push("-Z".into());
-    //     rustc_command_line_arguments.push("print_mono_items=eager".into()); // lazy or eager, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
-    // }
-
-    // if !rustc_command_line_arguments
-    //     .iter()
-    //     .any(|arg| arg.starts_with(&"share-generics"))
-    // {
-    //     // share-generics
-    //     rustc_command_line_arguments.push("-Z".into());
-    //     rustc_command_line_arguments.push("share-generics=y".into());
-    // }
-
+    if !rustc_command_line_arguments
+        .iter()
+        .any(|arg| arg.starts_with(&"print_mono_items"))
+    {
+        // Print mono items
+        rustc_command_line_arguments.push("-Z".into());
+        rustc_command_line_arguments.push("print_mono_items=lazy".into()); // lazy or eager if needed, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
+    }
 
     if !rustc_command_line_arguments
         .iter()
         .any(|arg| arg.starts_with(&"unstable-options"))
     {
-        // the `-Z unstable-options` flag must also be passed to enable `--extern` options
+        // the `-Z unstable-options` flag must also be passed to enable `--extern force:` options
         rustc_command_line_arguments.push("-Z".into());
         rustc_command_line_arguments.push("unstable-options".into());
     }
@@ -160,7 +150,7 @@ fn main() {
 
     let mut callbacks = Callbacks::new();
     let result = rustc_driver::catch_fatal_errors( || {
-        info!("rustc_command_line_arguments {:?}", rustc_command_line_arguments);
+        info!("rustc_command_line_arguments {:?}", rustc_command_line_arguments.join(" "));
         let compiler = rustc_driver::RunCompiler::new(&rustc_command_line_arguments, &mut callbacks);
         compiler
         .set_using_internal_features(using_internal_features)

@@ -14,7 +14,7 @@ pub(crate) struct PreScanInfo {
 pub(crate) fn try_match_with_our_function<'tcx>(tcx: TyCtxt<'tcx>, fn_def_id: &DefId, info: &mut PreScanInfo)  {
     let def_id = fn_def_id.clone();
     let fn_defpath_str = tcx.def_path_str(def_id);
-    debug!("try_match_with_our_function {}", fn_defpath_str);
+    info!("try_match_with_our_function {}", fn_defpath_str);
     match fn_defpath_str.as_str() {
         "this_is_our_monitor_function::this_is_our_test_target_before_handle_function" => {
             info.test_target_before_fn = Some(def_id);

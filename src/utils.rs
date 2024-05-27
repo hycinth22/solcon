@@ -95,12 +95,12 @@ pub fn rustc_logger_config() -> rustc_log::LoggerConfig {
         if matches!(cfg.filter, Err(env::VarError::NotPresent)) {
             // We try to be a bit clever here: if `SOLCON_LOG` is just a single level
             // used for everything, we only apply it to the parts of rustc that are
-            // CTFE-related. Otherwise, we use it verbatim for `RUSTC_LOG`.
+            // instrument-related. Otherwise, we use it verbatim for `RUSTC_LOG`.
             // This way, if you set `SOLCON_LOG=trace`, you get only the right parts of
             // rustc traced, but you can also do `SOLCON_LOG=miri=trace,rustc_const_eval::interpret=debug`.
             if tracing::Level::from_str(&var).is_ok() {
                 cfg.filter = Ok(format!(
-                    "rustc_middle::mir::interpret={var},rustc_const_eval::interpret={var},solcon_instrumenter={var}" // todo
+                    "rustc_metadata={var},rustc_resolve={var},rustc_interface={var},solcon_instrumenter={var}" // todo
                 ));
             } else {
                 cfg.filter = Ok(var);

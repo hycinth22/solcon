@@ -78,7 +78,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
                 ExportedSymbol::NonGeneric(def_id) => {
                     let def_path = tcx.def_path(*def_id);
                     let def_path_str = tcx.def_path_str(*def_id);
-                    trace!("found NonGeneric exported_symbols {} {}", def_path_str, symbol_export_info.used);
+                    info!("found NonGeneric exported_symbols {} {}", def_path_str, symbol_export_info.used);
                     // if is_filtered_def_path(tcx, &def_path) {
                     //     trace!("skip NonGeneric exported_symbols {:?} because utils::is_filtered_def_path", def_path_str);
                     //     continue;
@@ -88,7 +88,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
                 ExportedSymbol::Generic(def_id, generic_args) => {
                     let def_path = tcx.def_path(*def_id);
                     let def_path_str = tcx.def_path_str(*def_id);
-                    trace!("found Generic exported_symbols {} {}", def_path_str, symbol_export_info.used);
+                    info!("found Generic exported_symbols {} {}", def_path_str, symbol_export_info.used);
                     // if is_filtered_def_path(tcx, &def_path) {
                     //     trace!("skip Generic exported_symbols {:?} because utils::is_filtered_def_path", def_path_str);
                     //     continue;
