@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use tracing::{trace, debug, info, warn, error};
+use rustc_hir::BodyOwnerKind;
 use rustc_hir::definitions::DefPath;
 use rustc_hir::def::DefKind;
 use rustc_metadata::creader::CStore;
@@ -23,7 +24,6 @@ mod mutex_handler;
 
 pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     info!("our pass is running");
-    let all_function_local_def_ids = tcx.mir_keys(());
     info!("prescaning");
     let mut monitors = MonitorsInfo::default();
     let crates = tcx.crates(());
@@ -66,6 +66,14 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         let def_path = tcx.def_path(def_id);
         let def_path_str = tcx.def_path_str(def_id);
         let body_owner_kind = tcx.hir().body_owner_kind(*local_def_id);
+        match body_owner_kind {
+            BodyOwnerKind::Const{..} | BodyOwnerKind::Static(..) => {
+                warn!("skip body kind {:?}", body_owner_kind);
+                return;
+            }
+            BodyOwnerKind::Fn | BodyOwnerKind::Closure => {}
+        }
+
         // since the compiler doesnt provide mutable interface, using unsafe to get one from optimized_mir
         #[allow(invalid_reference_casting)]
         let body: &mut _ =  unsafe{
@@ -75,11 +83,6 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         };
         // let def_id = body.source.def_id();
         debug!("found body instance of {}", def_path_str);
-
-        if !body_owner_kind.is_fn_or_closure() {
-            // I think we should process all body including Const(?) and initializers of a static item.
-            warn!("processing body kind {:?}", body_owner_kind);
-        }
 
         if tcx.is_foreign_item(def_id) {
             // 跳过外部函数(例如 extern "C")
