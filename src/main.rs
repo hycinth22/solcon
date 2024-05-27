@@ -214,15 +214,16 @@ impl rustc_driver::Callbacks for Callbacks {
         info!("after_analysis input file: {}", self.file_name);
         let mut global_ctxt = queries.global_ctxt().unwrap();
         global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
+            let dcx = tcx.dcx();
             let opts = &tcx.sess.opts;
             let externs = &opts.externs;
             for (str, extern_entry) in externs.iter() {
                 info!("externs {}, force={}", str, extern_entry.force);
             }
             if tcx.sess.dcx().has_errors_or_delayed_bugs().is_some() {
-                tcx.dcx().fatal("solcon_instrumenter cannot be run on programs that fail compilation");
+                dcx.fatal("solcon_instrumenter cannot be run on programs that fail compilation");
             }
-            tcx.dcx().abort_if_errors();
+            dcx.abort_if_errors();
 
             for item_id in tcx.hir_crate_items(()).free_items() {
                 if matches!(tcx.def_kind(item_id.owner_id), rustc_hir::def::DefKind::Fn) {
@@ -262,31 +263,29 @@ impl rustc_driver::Callbacks for Callbacks {
                 *tcx.sess.ctfe_backtrace.borrow_mut() = ctfe_backtrace;
             }
 
-            if tcx.sess.dcx().has_errors_or_delayed_bugs().is_some() {
-                tcx.dcx().fatal("solcon_instructmenter cannot be run on programs that fail compilation");
+            if dcx.has_errors_or_delayed_bugs().is_some() {
+                dcx.fatal("solcon_instructmenter cannot be run on programs that fail compilation");
             }
             if tcx.sess.mir_opt_level() > 0 {
-                tcx.dcx().warn("Notice: You have explicitly enabled MIR optimizations!");
+                dcx.warn("Notice: You have explicitly enabled MIR optimizations!");
             }
-
-
             mirpass::run_our_pass(tcx);
-    let (items, cgus) = tcx.collect_and_partition_mono_items(());
-    info!("cgus.len {}", cgus.len());
-    let instances: Vec<Instance<'tcx>> = cgus
-    .iter()
-    .flat_map(|cgu| {
-        cgu.items().iter().filter_map(|(mono_item, _)| {
-            if let MonoItem::Fn(instance) = mono_item {
-                Some(*instance)
-            } else {
-                None
-            }
-        })
-    })
-    .collect();
-            //tcx.hir_crate(());
-            tcx.dcx().abort_if_errors();
+            dcx.abort_if_errors();
+            let (items, cgus) = tcx.collect_and_partition_mono_items(());
+            info!("cgus.len {}", cgus.len());
+            let instances: Vec<Instance<'tcx>> = cgus
+            .iter()
+            .flat_map(|cgu| {
+                cgu.items().iter().filter_map(|(mono_item, _)| {
+                    if let MonoItem::Fn(instance) = mono_item {
+                        Some(*instance)
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+            dcx.abort_if_errors();
         });
         if self.test_run {
             // We avoid code gen for test cases because LLVM is not used in a thread safe manner.

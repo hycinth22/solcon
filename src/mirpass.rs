@@ -23,16 +23,12 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     let all_function_local_def_ids = tcx.mir_keys(());
     info!("prescaning");
     let mut info = search_monitor::PreScanInfo::default();
-    // for def_id in items.iter() {
-    //     let body = tcx.optimized_mir(def_id);
     for local_def_id in all_function_local_def_ids {
         if !tcx.hir().body_owner_kind(*local_def_id).is_fn_or_closure() {
             continue;
         }
         let def_id = local_def_id.to_def_id();
         let body = tcx.optimized_mir(def_id);
-    // for instance in instances.iter() {
-    //     let body = tcx.instance_mir(instance.def);
         search_monitor::try_match_with_our_function(tcx, &body.source.def_id(), &mut info);
     }
     let crates = tcx.crates(());
@@ -305,55 +301,4 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
         }
     }
 }
-
-/*
-            if func_def_path_str == "this_is_our_monitor_function::this_is_our_test_target_function" {
-                info!("detect our test target function, transforming");
-                // 在函数调用之前插入我们的函数调用需要
-                // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
-                // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
-                let ourfunc = func.clone();
-                // this_terminator.target will be modify later because new block have not been inserted yet
-                let bbdata = BasicBlockData {
-                    statements: vec![],
-                    terminator: Some(Terminator {
-                        kind: TerminatorKind::Call { 
-                            func: func.clone(), 
-                            args: args.clone(), 
-                            destination: destination.clone(), 
-                            target: target.clone(),
-                            unwind: unwind.clone(), 
-                            call_source: call_source.clone(), 
-                            fn_span: fn_span.clone() },
-                        source_info: this_terminator.source_info.clone(),
-                    }),
-                    is_cleanup: false,
-                };
-                *func = ourfunc;
-                *destination = Place::from(alloc_unit_local(tcx, &mut body.local_decls));
-                insertBeforeCall.insert(block, bbdata);
-                // 在函数调用之后插入我们的函数调用需要
-                // 1 .更改当前块的terminator call的target到我们的新块
-                // 2. 在我们新生成的基本块中，terminator-kind为call，func为我们的函数，target到当前块的原target
-                // this_terminator.target will be modify later because new block have not been inserted yet
-                let ourfunc = func.clone();
-                let bbdata = BasicBlockData {
-                    statements: vec![],
-                    terminator: Some(Terminator {
-                        kind: TerminatorKind::Call { 
-                            func: ourfunc, 
-                            args: args.clone(), 
-                            destination: destination.clone(), 
-                            target: target.clone(),
-                            unwind: unwind.clone(), 
-                            call_source: call_source.clone(), 
-                            fn_span: fn_span.clone() },
-                        source_info: this_terminator.source_info.clone(),
-                    }),
-                    is_cleanup: false,
-                };
-                insertAfterCall.insert(block, bbdata);
-            }
-            else 
-*/
 
