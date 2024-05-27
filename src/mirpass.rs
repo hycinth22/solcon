@@ -88,23 +88,27 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
             }
         }
     }
-    let all_function_local_def_ids = tcx.mir_keys(());
+    let all_function_local_def_ids = tcx.mir_keys(()); // all the body owners, but also things like struct constructors.
     for local_def_id in all_function_local_def_ids {
-        if !tcx.hir().body_owner_kind(*local_def_id).is_fn_or_closure() {
-            continue;
-        }
         let def_id = local_def_id.to_def_id();
+        let def_path = tcx.def_path(def_id);
+        let def_path_str = tcx.def_path_str(def_id);
+        let body_owner_kind = tcx.hir().body_owner_kind(*local_def_id);
+        // since the compiler doesnt provide mutable interface, using unsafe to get one from optimized_mir
         #[allow(invalid_reference_casting)]
-        let body =  unsafe{
+        let body: &mut _ =  unsafe{
             let immutable_ref = tcx.optimized_mir(def_id);
             let mutable_ptr = immutable_ref as *const Body as *mut Body;
             &mut *mutable_ptr
         };
-        let def_id = body.source.def_id();
-        //assert!(tcx.is_codegened_item(def_id));
-        let def_path = tcx.def_path(def_id);
-        let def_path_str = tcx.def_path_str(def_id);
+        // let def_id = body.source.def_id();
         debug!("found body instance of {}", def_path_str);
+
+        if !body_owner_kind.is_fn_or_closure() {
+            // I think we should process all body including Const(?) and initializers of a static item.
+            warn!("processing body kind {:?}", body_owner_kind);
+        }
+
         if tcx.is_foreign_item(def_id) {
             // 跳过外部函数(例如 extern "C")
             trace!("skip body instance of {} because is_foreign_item", def_path_str);
@@ -119,6 +123,10 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
             trace!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
             continue;
         }
+        // if tcx.is_codegened_item(def_id) {
+        //     trace!("skip body instance of {:?} because not is_codegened_item", def_path_str);
+        //     continue;
+        // }
         debug!("visiting function body of {}", def_path_str);
         inject_for_bb(tcx, body, &info);
     }
