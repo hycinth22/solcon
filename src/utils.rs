@@ -51,7 +51,7 @@ pub fn find_sysroot() -> Option<String> {
     let home = option_env!("RUSTUP_HOME");
     let toolchain = option_env!("RUSTUP_TOOLCHAIN");
     if let (Some(home), Some(toolchain)) = (home, toolchain) {
-        return Some(format!("{}/toolchains/{}", home, toolchain));
+        return Some(format!("{home}/toolchains/{toolchain}"));
     }
     let out = std::process::Command::new("rustc").arg("--print=sysroot")
     .current_dir(".").output();

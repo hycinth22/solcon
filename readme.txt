@@ -3,21 +3,23 @@ Currently supports rust that latest update on 2024-05-22, rust version 1.80.0-ni
 # Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Install Rust toolchain & needed components
+# Install Rust toolchain & required components
 1. rustup toolchain install nightly-2024-05-22
 2. rustup +nightly-2024-05-22 component add rust-src
 3. rustup +nightly-2024-05-22 component add rustc-dev
 4. rustup +nightly-2024-05-22 component add llvm-tools-preview
 
-# Install & Configure solcon_instrumenter
+# Build & Install solcon_instrumenter using nightly
 1. git clone https://github.com/hycinth22/solcon_instrumenter
 2. cd solcon_instrumenter
-3. cargo build
+3. cargo +nightly-2024-05-22 build
 4. cargo install --path .
-5. cd this_is_our_monitor_function
-6. cargo build
-7. export SOLCON_MONITOR_LIB_PATH="$(pwd)/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
-8. export SOLCON_LOG="info"
+
+# Configure solcon_instrumenter
+1. cd this_is_our_monitor_function
+2. cargo build
+3. export SOLCON_MONITOR_LIB_PATH="$(pwd)/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
+4. export SOLCON_LOG="info"
 
 # Attach solcon_instrumenter to rustc
 1. export RUST_SYSROOT=$(rustc --print sysroot)

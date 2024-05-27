@@ -8,6 +8,7 @@ use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
 use rustc_middle::middle::exported_symbols::ExportedSymbol;
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::mir::ConstOperand;
+use rustc_session::cstore::CrateDepKind;
 use rustc_span::DUMMY_SP;
 
 pub(crate) use crate::utils;
@@ -19,20 +20,6 @@ mod mutex_handler;
 
 pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     info!("our pass is running");
-    // let (items, cgus) = tcx.collect_and_partition_mono_items(());
-    // info!("cgus.len {}", cgus.len());
-    // let instances: Vec<Instance<'tcx>> = cgus
-    // .iter()
-    // .flat_map(|cgu| {
-    //     cgu.items().iter().filter_map(|(mono_item, _)| {
-    //         if let MonoItem::Fn(instance) = mono_item {
-    //             Some(*instance)
-    //         } else {
-    //             None
-    //         }
-    //     })
-    // })
-    // .collect();
     let all_function_local_def_ids = tcx.mir_keys(());
     info!("prescaning");
     let mut info = search_monitor::PreScanInfo::default();
@@ -51,25 +38,20 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     let crates = tcx.crates(());
     for krate in crates {
         let krate = krate.clone();
+        let crate_name = tcx.crate_name(krate);
+        let crate_name_str = crate_name.as_str();
+        let dep_kind = tcx.dep_kind(krate);
+        if dep_kind != CrateDepKind::Explicit {
+            debug!("skip non-explicit crate dep {crate_name_str}");
+            continue;
+        }
+        if crate_name_str != "this_is_our_monitor_function" {
+            debug!("skip mismatch crate name {crate_name_str}");
+            continue;
+        }
         if is_filtered_crate(tcx, &krate) {
             continue;
         }
-        let crate_name = tcx.crate_name(krate);
-        let crate_name_str = crate_name.as_str();
-        // let dep_kind = tcx.dep_kind(krate);
-
-        //let reachable_non_generics = tcx.reachable_non_generics(krate);
-        // for def_id in reachable_non_generics.items() {
-        //     let def_path = tcx.def_path(def_id);
-        //     let def_path_str = tcx.def_path_str(def_id);
-        //     info!("found reachable_non_generics of {}", def_path_str);
-        //     if is_filtered_def_path(tcx, &def_path) {
-        //         trace!("skip reachable_non_generics of {:?} because utils::is_filtered_def_path", def_path_str);
-        //         continue;
-        //     }
-        //     let body = tcx.optimized_mir(def_id);
-        //     search_monitor::try_match_with_our_function(tcx, body, &mut info);
-        // }
         info!("visiting crate {}", crate_name_str);
         tcx.import_source_files(krate);
         let exported_symbols = tcx.exported_symbols(krate);
@@ -110,18 +92,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
             }
         }
     }
-    // dbg!(&info);
-    // for instance in instances.iter() {
-    //     let body = tcx.instance_mir(instance.def);
-    //     find_our_function(tcx, instance, &mut info);
-    // }
-    // for instance in instances {
-    //     #[allow(invalid_reference_casting)]
-    //     let body = unsafe {
-    //         let immutable_ref = tcx.instance_mir(instance.def);
-    //         let mutable_ptr = immutable_ref as *const Body as *mut Body;
-    //         &mut *mutable_ptr
-    //    };
+    let all_function_local_def_ids = tcx.mir_keys(());
     for local_def_id in all_function_local_def_ids {
         if !tcx.hir().body_owner_kind(*local_def_id).is_fn_or_closure() {
             continue;
@@ -133,27 +104,13 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
             let mutable_ptr = immutable_ref as *const Body as *mut Body;
             &mut *mutable_ptr
         };
-    //     let mirbody = tcx.mir_built(local_def_id);
-    //     #[allow(invalid_reference_casting)]
-    //     let mirbody = unsafe {
-    //         let immutable_ref = mirbody;
-    //         let mutable_ptr = immutable_ref as *const Steal<Body> as *mut Steal<Body>;
-    //         &mut *mutable_ptr
-    //    };
-    //     let body = mirbody.get_mut();
-    //     #[allow(invalid_reference_casting)]
-    //     let body = unsafe {
-    //         let immutable_ref = body;
-    //         let mutable_ptr = immutable_ref as *const Body as *mut Body;
-    //         &mut *mutable_ptr
-    //    };
         let def_id = body.source.def_id();
         //assert!(tcx.is_codegened_item(def_id));
         let def_path = tcx.def_path(def_id);
         let def_path_str = tcx.def_path_str(def_id);
         debug!("found body instance of {}", def_path_str);
         if tcx.is_foreign_item(def_id) {
-            // 跳过外部函数(例如 extern "C"{} )
+            // 跳过外部函数(例如 extern "C")
             trace!("skip body instance of {} because is_foreign_item", def_path_str);
             continue;
         }
@@ -227,40 +184,6 @@ fn is_target_crate(tcx: TyCtxt<'_>, krate: &CrateNum, target_crates: &[&str]) ->
     target_crates.contains(&crate_name_str)
 }
 
-// fn find_def_id_by_path(tcx: TyCtxt<'_>, def_path: &[&str]) -> Option<DefId> {
-//     // 获取根 DefId
-//     let root_def_id = tcx.hir().as_local_hir_id(0);
-
-//     // 查找根 DefPath
-//     let root_def_path = tcx.def_path(root_def_id).to_string();
-
-//     // 比较根 DefPath 和目标 DefPath 的共同前缀
-//     let mut common_prefix_len = 0;
-//     while common_prefix_len < root_def_path.len() && common_prefix_len < def_path.len() {
-//         if root_def_path[common_prefix_len] != def_path[common_prefix_len] {
-//             break;
-//         }
-//         common_prefix_len += 1;
-//     }
-
-//     // 构造目标 DefPath
-//     let mut target_def_path = root_def_path;
-//     for segment in &def_path[common_prefix_len..] {
-//         target_def_path.push_str("::");
-//         target_def_path.push_str(segment);
-//     }
-
-//     // 查找目标 DefId
-//     for &def_id in tcx.global_ctors().iter().chain(tcx.hir().krate().exports) {
-//         let current_def_path = tcx.def_path(def_id);
-//         if current_def_path.to_string() == target_def_path {
-//             return Some(def_id);
-//         }
-//     }
-
-//     None
-// }
-
 fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_info: &search_monitor::PreScanInfo) {
     // 遍历基本块
     let bbs = body.basic_blocks.as_mut();
@@ -283,8 +206,8 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
                 info!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
                 if let Some(before_fn) = prescan_info.test_target_before_fn {
                     info!("instrumenting target_before at {}", func_def_path_str);
-                    let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
-                    insert_before_call.extend(insertblocks);
+                    //let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
+                    //insert_before_call.extend(insertblocks);
                 } else {
                     warn!("prescan_info.test_target_before_fn.is_none");
                 }
@@ -293,8 +216,8 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
                 "this_is_our_test_target_mod::this_is_our_test_target_function"  => {
                     info!("Found call to this_is_our_test_target_function: {:?} (should instrument before)", func_def_path_str);
                     if let Some(before_fn) = prescan_info.test_target_before_fn {
-                        let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
-                        insert_before_call.extend(insertblocks);
+                        //let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
+                        //insert_before_call.extend(insertblocks);
                     } else {
                         warn!("prescan_info.test_target_before_fn.is_none");
                     }
@@ -338,8 +261,8 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
             if func_def_path_str.ends_with("::this_is_our_test_target_mod::this_is_our_test_target_function") {
                 info!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
                 if let Some(after_fn) = prescan_info.test_target_after_fn {
-                    let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
-                    insert_after_call.extend(insertblocks);
+                    //let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
+                    //insert_after_call.extend(insertblocks);
                 } else {
                     warn!("prescan_info.test_target_after_fn.is_none");
                 }
@@ -348,16 +271,16 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
                 "this_is_our_test_target_mod::this_is_our_test_target_function" => {
                     info!("Found call to this_is_our_test_target_function: {:?} (should instrument after)", func_def_path_str);
                     if let Some(after_fn) = prescan_info.test_target_after_fn {
-                        let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
-                        insert_after_call.extend(insertblocks);
+                        //let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
+                        //insert_after_call.extend(insertblocks);
                     } else {
                         warn!("prescan_info.test_target_after_fn.is_none");
                     }
                 }
                 "std::sync::Mutex::<T>::lock" => {
                     info!("Found call to mutex lock: {:?}  (should instrument after)", func_def_path_str);
-                    let insertblocks = mutex_handler::add_mutex_lock_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block);
-                    insert_after_call.extend(insertblocks);
+                    //let insertblocks = mutex_handler::add_mutex_lock_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block);
+                    //insert_after_call.extend(insertblocks);
                 }
                 _ => {}
             }

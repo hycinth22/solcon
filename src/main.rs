@@ -21,20 +21,25 @@ extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
 
+use tracing::{info, trace};
 use rustc_driver::Compilation;
 use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
+use rustc_middle::ty::Instance;
+use rustc_middle::mir::mono::MonoItem;
 use std::path::PathBuf;
 use std::env;
+
 mod mirpass;
 mod utils;
-use tracing::{info, trace};
+
 
 // inspired by lockbud & miri
 fn main() {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     utils::jemalloc_magic();
 
+    // Initialize early diagnostics context
     let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
 
     // Snapshot a copy of the environment before `rustc` starts messing with it.
@@ -51,12 +56,8 @@ fn main() {
     let using_internal_features = rustc_driver::install_ice_hook("internal complier error", |_| ());
 
     // Initialize loggers.
-    // let early_dcx = rustc_session::EarlyDiagCtxt::new(ErrorOutputType::default());
-    // if std::env::var("RUSTC_LOG").is_ok() {
-    //     rustc_driver::init_rustc_env_logger(&early_dcx);
-    // }
     if std::env::var_os("RUSTC_LOG").is_some() {
-        rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config());
+        rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config()); // similar to rustc_driver::init_rustc_env_logger(&early_dcx), but init_rustc_env_logger use environment variable
         info!("init_logger from RUSTC_LOG");
     }
 
@@ -91,12 +92,13 @@ fn main() {
     let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = utils::find_our_monitor_lib() else {
         early_dcx.early_fatal("solcon monitor function rlib not exist");
     };
-    //let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = (solcon_monitor_function_rlib_filepath.unwrap(), solcon_monitor_function_rlib_dirpath.unwrap());
-   // force make the monitor function become dependency of each crate & linked to each crate
+
+   // forcely make our monitor lib become dependency of each crate & linked to each crate
    // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L127
+   // use --extern to specify direct dependency
    rustc_command_line_arguments.push("--extern".to_owned());
    rustc_command_line_arguments.push(format!("force:{solcon_monitor_function_lib_crate_name}={solcon_monitor_function_rlib_filepath}"));
-   
+   // because our monitor lib is dependency of each crate, so downstream crate also transmitively dependent on ur monitor lib and search on directories of -L
    rustc_command_line_arguments.push("-L".to_owned());
    rustc_command_line_arguments.push(format!("dependency={solcon_monitor_function_rlib_dirpath}"));
 
@@ -115,7 +117,7 @@ fn main() {
         .iter()
         .any(|arg| arg.starts_with(&"mir-opt-level"))
     {
-        // Tell compiler to generate non optimized builds
+        // Tell compiler to generate non optimized mir
         rustc_command_line_arguments.push("-Z".into());
         rustc_command_line_arguments.push("mir-opt-level=0".into());
     }
@@ -137,16 +139,6 @@ fn main() {
         rustc_command_line_arguments.push("-Z".into());
         rustc_command_line_arguments.push("unstable-options".into());
     }
-
-    // let link_dead_code: String = "link-dead-code".into();
-    // if !rustc_command_line_arguments
-    //     .iter()
-    //     .any(|arg| arg.ends_with(&link_dead_code))
-    // {
-    //     // Tell compiler to link dead code
-    //     rustc_command_line_arguments.push("-C".into());
-    //     rustc_command_line_arguments.push(link_dead_code);
-    // }
 
     let mut callbacks = Callbacks::new();
     let result = rustc_driver::catch_fatal_errors( || {
@@ -279,7 +271,20 @@ impl rustc_driver::Callbacks for Callbacks {
 
 
             mirpass::run_our_pass(tcx);
-            //tcx.collect_and_partition_mono_items(());
+    let (items, cgus) = tcx.collect_and_partition_mono_items(());
+    info!("cgus.len {}", cgus.len());
+    let instances: Vec<Instance<'tcx>> = cgus
+    .iter()
+    .flat_map(|cgu| {
+        cgu.items().iter().filter_map(|(mono_item, _)| {
+            if let MonoItem::Fn(instance) = mono_item {
+                Some(*instance)
+            } else {
+                None
+            }
+        })
+    })
+    .collect();
             //tcx.hir_crate(());
             tcx.dcx().abort_if_errors();
         });
