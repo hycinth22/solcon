@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "testcasemain",
-    "testcaseanother"
+    "testcaseanother",
+    "testcase_mutex_dyn_type",
 ]
 
 

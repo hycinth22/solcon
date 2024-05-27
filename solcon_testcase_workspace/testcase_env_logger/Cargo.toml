@@ -1,0 +1,8 @@
+[package]
+name = "testcase_env_logger"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+env_logger = { version="0.9.3" }
+log = { version="0.4.21" }

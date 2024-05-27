@@ -4,10 +4,10 @@ use rustc_middle::mir::{self, BasicBlock, BasicBlockData, BorrowKind, ConstOpera
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
 
-use super::{search_monitor::PreScanInfo, utils::{alloc_unit_local, get_function_generic_args}};
+use crate::{monitors::MonitorsInfo, utils::{alloc_unit_local, get_function_generic_args}};
 
 pub(crate) fn add_mutex_lock_before_handler<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
-prescan_info: &PreScanInfo, 
+prescan_info: &MonitorsInfo, 
 /* call: &mut TerminatorKind<'tcx>,  */this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock) 
 -> HashMap<BasicBlock, BasicBlockData<'tcx> >
 {
@@ -33,13 +33,13 @@ prescan_info: &PreScanInfo,
             let func_def_id = prescan_info.mutex_lock_before_fn.unwrap();
             let is_generic_func = tcx.generics_of(func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
             let func_ty = {
-                let binder = tcx.type_of(func_def_id);
-                let generics = tcx.generics_of(func_def_id);
-                if is_generic_func{
-                    binder.instantiate(tcx, generic_args)
-                } else {
-                    binder.instantiate_identity()
-                }
+                 let binder = tcx.type_of(func_def_id);
+                 let generics = tcx.generics_of(func_def_id);
+                 if is_generic_func{
+                     binder.instantiate(tcx, generic_args)
+                 } else {
+                     binder.instantiate_identity()
+                 }
             };
             let const_ = mir::Const::zero_sized(func_ty);
             // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
@@ -101,7 +101,7 @@ prescan_info: &PreScanInfo,
 }
 
 pub(crate) fn add_mutex_lock_after_handler<'tcx>(
-    tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, prescan_info: &PreScanInfo, this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock
+    tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, prescan_info: &MonitorsInfo, this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock
 ) -> HashMap<BasicBlock, BasicBlockData<'tcx> >
 {
     // 在函数调用之后插入我们的函数调用需要

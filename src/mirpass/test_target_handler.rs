@@ -7,11 +7,11 @@ use rustc_middle::mir::{self, BasicBlock, BasicBlockData, BorrowKind, ConstOpera
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
 
-use super::{search_monitor::PreScanInfo};
+use crate::{monitors::MonitorsInfo};
 use super::utils::{alloc_unit_local, get_function_generic_args};
 
 pub(crate) fn add_before_handler<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
-prescan_info: &PreScanInfo, 
+prescan_info: &MonitorsInfo, 
 this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock,
 our_func_def_id: DefId
 ) 
@@ -62,13 +62,27 @@ our_func_def_id: DefId
         };
         // this_terminator.target will be modify later because new block have not been inserted yet
         let mut our_args = {
-            // 不能直接clone，因为我们可能会错误地提前move参数，应该由原来的函数调用move它，我们更改所有move为copy（如果参数没有实现copy呢？考虑把所有参数引用化？）
             let mut our_args = args.clone();
+            // 不能直接clone，因为我们可能会错误地提前move参数，应该由原来的函数调用move它，我们更改所有move为copy（如果参数没有实现copy呢？考虑把所有参数引用化？）
             for arg in our_args.iter_mut() {
                 if let Operand::Move(place) = arg.node {
                     arg.node = Operand::Copy(place);
                 }
             }
+            // // 查找所有trait对象的引用
+            // for arg in our_args.iter_mut() {
+            //     let operand_ty = get_operand_ty(local_decls, &arg.node);
+            //     let ty_kind: &rustc_type_ir::TyKind<TyCtxt> = operand_ty.kind();
+            //     match ty_kind {
+            //         ty::TyKind::Ref() => {
+
+            //         }
+            //         ty::TyKind::Dynamic() => {
+
+            //         }
+            //         _ => {}
+            //     }
+            // }
             our_args
         };
         let bbdata = BasicBlockData {
@@ -101,7 +115,7 @@ our_func_def_id: DefId
 }
 
 pub(crate) fn add_after_handler<'tcx>(
-    tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, prescan_info: &PreScanInfo, this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock,
+    tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, prescan_info: &MonitorsInfo, this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock,
     our_func_def_id: DefId
 ) -> HashMap<BasicBlock, BasicBlockData<'tcx> >
 {

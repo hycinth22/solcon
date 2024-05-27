@@ -2,92 +2,64 @@ use std::collections::HashMap;
 
 use tracing::{trace, debug, info, warn, error};
 use rustc_hir::definitions::DefPath;
-use rustc_hir::def_id::{CrateNum, DefId};
+use rustc_hir::def::DefKind;
+use rustc_metadata::creader::CStore;
 use rustc_middle::mir::{*};
 use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
 use rustc_middle::middle::exported_symbols::ExportedSymbol;
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::mir::ConstOperand;
 use rustc_session::cstore::CrateDepKind;
-use rustc_span::DUMMY_SP;
+use rustc_span::{
+    def_id::{CrateNum, DefId, DefIndex, LOCAL_CRATE},
+    DUMMY_SP,
+};
 
 pub(crate) use crate::utils;
+use crate::monitors::{self, try_match_with_our_function, MonitorsInfo};
 
-mod search_monitor;
 mod test_target_handler;
 mod mutex_handler;
-
 
 pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     info!("our pass is running");
     let all_function_local_def_ids = tcx.mir_keys(());
     info!("prescaning");
-    let mut info = search_monitor::PreScanInfo::default();
-    for local_def_id in all_function_local_def_ids {
-        if !tcx.hir().body_owner_kind(*local_def_id).is_fn_or_closure() {
-            continue;
-        }
-        let def_id = local_def_id.to_def_id();
-        let body = tcx.optimized_mir(def_id);
-        search_monitor::try_match_with_our_function(tcx, &body.source.def_id(), &mut info);
-    }
+    let mut monitors = MonitorsInfo::default();
     let crates = tcx.crates(());
+    let crate_store_untracked = tcx.cstore_untracked();
+    let crate_store = crate_store_untracked
+        .as_any()
+        .downcast_ref::<CStore>()
+        .unwrap();
     for krate in crates {
         let krate = krate.clone();
-        let crate_name = tcx.crate_name(krate);
-        let crate_name_str = crate_name.as_str();
-        let dep_kind = tcx.dep_kind(krate);
-        if dep_kind != CrateDepKind::Explicit {
-            debug!("skip non-explicit crate dep {crate_name_str}");
-            continue;
-        }
-        if crate_name_str != "this_is_our_monitor_function" {
-            debug!("skip mismatch crate name {crate_name_str}");
-            continue;
-        }
-        if is_filtered_crate(tcx, &krate) {
-            continue;
-        }
-        info!("visiting crate {}", crate_name_str);
-        tcx.import_source_files(krate);
-        let exported_symbols = tcx.exported_symbols(krate);
-        for (symbol, symbol_export_info) in exported_symbols.iter() {
-            match symbol {
-                ExportedSymbol::NonGeneric(def_id) => {
-                    let def_path = tcx.def_path(*def_id);
-                    let def_path_str = tcx.def_path_str(*def_id);
-                    info!("found NonGeneric exported_symbols {} {}", def_path_str, symbol_export_info.used);
-                    // if is_filtered_def_path(tcx, &def_path) {
-                    //     trace!("skip NonGeneric exported_symbols {:?} because utils::is_filtered_def_path", def_path_str);
-                    //     continue;
-                    // }
-                    search_monitor::try_match_with_our_function(tcx, &def_id, &mut info);
-                }
-                ExportedSymbol::Generic(def_id, generic_args) => {
-                    let def_path = tcx.def_path(*def_id);
-                    let def_path_str = tcx.def_path_str(*def_id);
-                    info!("found Generic exported_symbols {} {}", def_path_str, symbol_export_info.used);
-                    // if is_filtered_def_path(tcx, &def_path) {
-                    //     trace!("skip Generic exported_symbols {:?} because utils::is_filtered_def_path", def_path_str);
-                    //     continue;
-                    // }
-                    search_monitor::try_match_with_our_function(tcx, &def_id, &mut info);
-                }
-                ExportedSymbol::DropGlue(ty) | ExportedSymbol::AsyncDropGlueCtorShim(ty) => {
-                    let ty_str = ty.to_string();
-                    trace!("found DropGlue or AsyncDropGlueCtorShim exported_symbols {}", ty_str);
-                }
-                ExportedSymbol::ThreadLocalShim(def_id) => {
-                    let def_path = tcx.def_path(*def_id);
-                    let def_path_str = tcx.def_path_str(*def_id);
-                    trace!("found ThreadLocalShim exported_symbols {}", def_path_str);
-                }
-                ExportedSymbol::NoDefId(symbol_name) => {
-                    trace!("found NoDefId exported_symbols {}", symbol_name);
+        if krate != LOCAL_CRATE {
+            let crate_name = tcx.crate_name(krate);
+            if crate_name.as_str() != "this_is_our_monitor_function" {
+                info!("skip mismatch crate name {crate_name}");
+                continue;
+            }
+            let crate_dep_kind = tcx.dep_kind(krate);
+            info!("traversaling crate {}", crate_name);
+            // Only public-facing way to traverse all the definitions in a non-local crate.
+            // inspired by hacspec(https://github.com/rust-lang/rust/pull/85889)
+            let crate_num_def_ids = crate_store.num_def_ids_untracked(krate);
+            let def_ids = (0..crate_num_def_ids).into_iter().map(|id| DefId {
+                krate: krate,
+                index: DefIndex::from_usize(id),
+            });
+            for def_id in def_ids {
+                let def_path_str = tcx.def_path_str(def_id);
+                let def_kind = tcx.def_kind(def_id);
+                info!("found external {def_kind:?} : {}", def_path_str);
+                if matches!(def_kind, DefKind::Fn) {
+                    try_match_with_our_function(tcx, &def_id, &mut monitors);
                 }
             }
         }
     }
+    info!("{monitors:#?}");
     let all_function_local_def_ids = tcx.mir_keys(()); // all the body owners, but also things like struct constructors.
     for local_def_id in all_function_local_def_ids {
         let def_id = local_def_id.to_def_id();
@@ -123,12 +95,13 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
             trace!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
             continue;
         }
-        // if tcx.is_codegened_item(def_id) {
-        //     trace!("skip body instance of {:?} because not is_codegened_item", def_path_str);
+        // dont know why enable here leads to undefined symbol. unfinished
+        // if !tcx.is_codegened_item(def_id) {
+        //     warn!("skip body instance of {:?} because not is_codegened_item", def_path_str);
         //     continue;
         // }
         debug!("visiting function body of {}", def_path_str);
-        inject_for_bb(tcx, body, &info);
+        inject_for_bb(tcx, body, &monitors);
     }
 }
 
@@ -182,7 +155,7 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
     false
 }
 
-fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_info: &search_monitor::PreScanInfo) {
+fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: &MonitorsInfo) {
     // 遍历基本块
     let bbs = body.basic_blocks.as_mut();
     let mut insert_before_call = HashMap::new();
@@ -198,44 +171,30 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
                 continue;
             }
             let func_def_path_str = func_def_path_str.unwrap();
-            // info!("found function call: {:?}", func_def_path_str);
             debug!("Found call to function: {:?}", func_def_path_str);
-            if func_def_path_str.ends_with("::this_is_our_test_target_mod::this_is_our_test_target_function") {
-                info!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
-                if let Some(before_fn) = prescan_info.test_target_before_fn {
-                    info!("instrumenting target_before at {}", func_def_path_str);
-                    //let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
-                    //insert_before_call.extend(insertblocks);
-                } else {
-                    warn!("prescan_info.test_target_before_fn.is_none");
-                }
-            }
             match func_def_path_str.as_str() {
                 "this_is_our_test_target_mod::this_is_our_test_target_function"  => {
                     info!("Found call to this_is_our_test_target_function: {:?} (should instrument before)", func_def_path_str);
-                    if let Some(before_fn) = prescan_info.test_target_before_fn {
-                        //let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, before_fn);
-                        //insert_before_call.extend(insertblocks);
+                    if let Some(before_fn) = monitors.test_target_before_fn {
+                        let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, monitors, this_terminator, block, before_fn);
+                        insert_before_call.extend(insertblocks);
                     } else {
-                        warn!("prescan_info.test_target_before_fn.is_none");
+                        warn!("monitors.test_target_before_fn.is_none");
                     }
                 }
                 "std::sync::Mutex::<T>::lock" => {
                     info!("Found call to mutex lock: {:?}  (should instrument before)", func_def_path_str);
-                    let insertblocks = mutex_handler::add_mutex_lock_before_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block);
+                    let insertblocks = mutex_handler::add_mutex_lock_before_handler(tcx, &mut body.local_decls, monitors, this_terminator, block);
                     insert_before_call.extend(insertblocks);
                 }
                 _ => {}
             }
         }
     }
-    //let mut relocate_map = HashMap::new();
     for (origin_block, newblockdata) in insert_before_call.into_iter() {
         let newblockindex = bbs.push(newblockdata);
         if let TerminatorKind::Call { target, .. } = &mut bbs[origin_block].terminator_mut().kind {
             *target = Some(newblockindex);
-            // 因为insertBeforeCall会影响原基本块，原函数调用是在新块运行，我们记录原块和新块的对应关系以便其他修改
-            //relocate_map.insert(origin_block, newblockindex);
         } else {
             panic!("all terminiator ins insertBeforeCall must be TerminatorKind::Call")
         }
@@ -253,48 +212,27 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, prescan_in
                 continue;
             }
             let func_def_path_str = func_def_path_str.unwrap();
-            // info!("found function call: {:?}", func_def_path_str);
             debug!("Found call to function: {:?}", func_def_path_str);
-
-            if func_def_path_str.ends_with("::this_is_our_test_target_mod::this_is_our_test_target_function") {
-                info!("Found foreigner's call to this_is_our_test_target_function: {:?}", func_def_path_str);
-                if let Some(after_fn) = prescan_info.test_target_after_fn {
-                    //let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
-                    //insert_after_call.extend(insertblocks);
-                } else {
-                    warn!("prescan_info.test_target_after_fn.is_none");
-                }
-            }
             match func_def_path_str.as_str() {
                 "this_is_our_test_target_mod::this_is_our_test_target_function" => {
                     info!("Found call to this_is_our_test_target_function: {:?} (should instrument after)", func_def_path_str);
-                    if let Some(after_fn) = prescan_info.test_target_after_fn {
-                        //let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block, after_fn);
-                        //insert_after_call.extend(insertblocks);
+                    if let Some(after_fn) = monitors.test_target_after_fn {
+                        let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, monitors, this_terminator, block, after_fn);
+                        insert_after_call.extend(insertblocks);
                     } else {
-                        warn!("prescan_info.test_target_after_fn.is_none");
+                        warn!("monitors.test_target_after_fn.is_none");
                     }
                 }
                 "std::sync::Mutex::<T>::lock" => {
                     info!("Found call to mutex lock: {:?}  (should instrument after)", func_def_path_str);
-                    //let insertblocks = mutex_handler::add_mutex_lock_after_handler(tcx, &mut body.local_decls, prescan_info, this_terminator, block);
-                    //insert_after_call.extend(insertblocks);
+                    let insertblocks = mutex_handler::add_mutex_lock_after_handler(tcx, &mut body.local_decls, monitors, this_terminator, block);
+                    insert_after_call.extend(insertblocks);
                 }
                 _ => {}
             }
         }
     }
-    
-
     for (origin_block, newblockdata) in insert_after_call.into_iter() {
-        // let origin_block = {
-        //      // 因为insertBeforeCall会影响原基本块，原函数调用是在新块运行，我们应该应用insertBeforeCall留下的修正信息
-        //     if let Some(redirect_block) = relocate_map.remove(&origin_block) {
-        //         redirect_block
-        //     } else {
-        //         origin_block
-        //     }
-        // };
         let newblockindex = bbs.push(newblockdata);
         if let TerminatorKind::Call { target, .. } = &mut bbs[origin_block].terminator_mut().kind {
             *target = Some(newblockindex);

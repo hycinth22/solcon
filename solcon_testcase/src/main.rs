@@ -38,6 +38,7 @@ fn f222() {
 }
 
 fn main() {
+    //testcase_anothercrate::generic_fun(&123);
     target::main();
     mutex::main();
     f();

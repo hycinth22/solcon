@@ -1,5 +1,9 @@
 use rustc_middle::ty::{self, TyCtxt};
-use rustc_span::def_id::CrateNum;
+use rustc_span::{
+    def_id::{CrateNum, DefId, DefIndex, LOCAL_CRATE},
+    DUMMY_SP,
+};
+use tracing::info;
 
 pub fn should_process<'tcx>(tcx: TyCtxt<'tcx>) -> bool {
     // TODO: implement an filter here

@@ -57,5 +57,7 @@ fn main() {
         println!("Hello, moveclosure! {}", e);
     };
     testcase_anothercrate::fothercrate();
+    testcase_anothercrate::generic_fun(&123);
+    testcase_mutex_dyn_type::ff();
     unused();
 }

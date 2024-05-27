@@ -17,6 +17,7 @@ extern crate rustc_index;
 extern crate rustc_interface;
 extern crate rustc_log;
 extern crate rustc_type_ir;
+extern crate rustc_metadata;
 extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
@@ -32,6 +33,7 @@ use std::env;
 
 mod check_input;
 mod mirpass;
+pub(crate) mod monitors;
 mod utils;
 
 
@@ -94,7 +96,7 @@ fn main() {
     let solcon_monitor_function_lib_crate_name = "this_is_our_monitor_function";
     // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
     let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = utils::find_our_monitor_lib() else {
-        early_dcx.early_fatal("solcon monitor function rlib not exist")
+       early_dcx.early_fatal("solcon monitor function rlib not exist")
     };
 
    // forcely make our monitor lib become dependency of each crate & linked to each crate
@@ -279,6 +281,10 @@ impl rustc_driver::Callbacks for Callbacks {
 
             // Transform
             mirpass::run_our_pass(tcx);
+            dcx.abort_if_errors();
+
+            // Post-check
+            tcx.ensure().analysis(());
             dcx.abort_if_errors();
 
             // Build
