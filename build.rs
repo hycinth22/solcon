@@ -1,3 +1,4 @@
+
 fn get_sysroot_from_rustc() -> Option<String> {
     let out = std::process::Command::new("rustc").arg("--print=sysroot")
     .current_dir(".").output();
@@ -11,6 +12,7 @@ fn get_sysroot_from_rustc() -> Option<String> {
 }
 
 fn main() {
+    // set environment variable RUST_SYSROOT from rustc at compile-time
     if let Some(sysroot) = get_sysroot_from_rustc() {
         println!("cargo::rustc-env=RUST_SYSROOT={}", sysroot);
     }
