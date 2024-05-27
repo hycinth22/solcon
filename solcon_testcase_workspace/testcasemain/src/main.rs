@@ -59,5 +59,6 @@ fn main() {
     testcase_anothercrate::fothercrate();
     testcase_anothercrate::generic_fun(&123);
     testcase_mutex_dyn_type::ff();
+    testcase_env_logger::ff();
     unused();
 }

@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 testcase_anothercrate = { path = "../testcaseanother" }
 testcase_mutex_dyn_type = { path = "../testcase_mutex_dyn_type" }
+testcase_env_logger = { path = "../testcase_env_logger" }

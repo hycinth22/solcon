@@ -3,6 +3,7 @@ use log::Record;
 use log::Log;
 
 pub fn ff() {
+     println!("hello from testcase_env_logger");
      let mut b = env_logger::builder();
      b.target(Target::Stdout);
      let l = b.build();
@@ -14,4 +15,5 @@ pub fn ff() {
                 .module_path(Some("server"))
                 .build();
      l.log(&record);
+     println!("bye from testcase_env_logger");
 }
