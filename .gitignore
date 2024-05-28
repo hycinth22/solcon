@@ -1,7 +1,11 @@
 target/
 *.mir
 *.exe
+*.dll
 *.pdb
 *.log
+*.rlib
+*.so
+*.d
 rustc-ice-*.txt
 /solcon_testcase/all-log
