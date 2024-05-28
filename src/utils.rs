@@ -100,7 +100,7 @@ pub fn rustc_logger_config() -> rustc_log::LoggerConfig {
             // rustc traced, but you can also do `SOLCON_LOG=miri=trace,rustc_const_eval::interpret=debug`.
             if tracing::Level::from_str(&var).is_ok() {
                 cfg.filter = Ok(format!(
-                    "rustc_metadata={var},rustc_resolve={var},rustc_interface={var},solcon_instrumenter={var}" // todo
+                    "rustc_metadata={var},rustc_resolve={var},rustc_interface={var}"
                 ));
             } else {
                 cfg.filter = Ok(var);

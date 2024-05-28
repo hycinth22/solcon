@@ -9,7 +9,8 @@
 #![allow(dead_code)]
 #![allow(unused_mut)]
 
-extern crate tracing; // share from rustc
+#[macro_use]
+extern crate tracing; // shared from rustc
 extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_hir;
@@ -28,8 +29,9 @@ use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
 use rustc_middle::ty::Instance;
 use rustc_middle::mir::mono::MonoItem;
-use std::path::PathBuf;
 use std::env;
+use std::io::{self, IsTerminal};
+use std::path::PathBuf;
 
 mod config;
 mod check_input;
@@ -63,6 +65,16 @@ fn main() {
     // Initialize loggers.
     let mut logger_inited = false;
     if std::env::var_os("RUSTC_LOG").is_some() {
+        // When using CI artifacts with `download-rustc`, tracing is unconditionally built
+        // with `--features=static_max_level_info`, which disables almost all rustdoc logging. To avoid
+        // this, compile our own version of `tracing` that logs all levels.
+        // NOTE: this compiles both versions of tracing unconditionally, because
+        // - The compile time hit is not that bad, especially compared to rustdoc's incremental times, and
+        // - Otherwise, there's no warning that logging is being ignored when `download-rustc` is enabled
+        // NOTE: The reason this doesn't show double logging when `download-rustc = false` and
+        // `debug_logging = true` is because all rustc logging goes to its version of tracing (the one
+        // in the sysroot), and all of rustdoc's logging goes to its version (the one in Cargo.toml).
+        init_logging(&early_dcx);
         rustc_driver::init_logger(&early_dcx, utils::rustc_logger_config()); // similar to rustc_driver::init_rustc_env_logger(&early_dcx), but init_rustc_env_logger use environment variable
         info!("init_logger from RUSTC_LOG");
         logger_inited = true;
@@ -161,6 +173,34 @@ fn main() {
     std::process::exit(exit_code);
 }
 
+// here inspired by librustdoc
+fn init_logging(early_dcx: &EarlyDiagCtxt) {
+    let color_logs = match env::var("SOLCON_LOG_COLOR").as_deref() {
+        Ok("always") => true,
+        Ok("never") => false,
+        Ok("auto") | Err(env::VarError::NotPresent) => io::stdout().is_terminal(),
+        Ok(value) => early_dcx.early_fatal(format!(
+            "invalid log color value '{value}': expected one of always, never, or auto",
+        )),
+        Err(env::VarError::NotUnicode(value)) => early_dcx.early_fatal(format!(
+            "invalid log color value '{}': expected one of always, never, or auto",
+            value.to_string_lossy()
+        )),
+    };
+    let filter = tracing_subscriber::EnvFilter::from_env("SOLCON_LOG");
+    let layer = tracing_tree::HierarchicalLayer::default()
+        .with_writer(io::stderr)
+        .with_indent_lines(true)
+        .with_ansi(color_logs)
+        .with_targets(true)
+        .with_wraparound(10)
+        .with_verbose_exit(true)
+        .with_verbose_entry(true)
+        .with_indent_amount(2);
+    use tracing_subscriber::layer::SubscriberExt;
+    let subscriber = tracing_subscriber::Registry::default().with(filter).with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+}
 
 struct Callbacks {
     need_init_logger: bool,

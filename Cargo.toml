@@ -5,20 +5,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# log = "0.4.11"
-# env_logger = "0.8.2"
-# rustc_data_structures = { path = "../rust240515/compiler/rustc_data_structures" }
-# rustc_driver = { path = "../rust240515/compiler/rustc_driver" }
-# rustc_hir = { path = "../rust240515/compiler/rustc_hir" }
-# rustc_index = { path = "../rust240515/compiler/rustc_index" }
-# rustc_interface = { path = "../rust240515/compiler/rustc_interface" }
-# rustc_log = { path = "../rust240515/compiler/rustc_log" }
-# rustc_type_ir = { path = "../rust240515/compiler/rustc_type_ir" }
-# rustc_middle = { path = "../rust240515/compiler/rustc_middle" }
-# rustc_session = { path = "../rust240515/compiler/rustc_session" }
-# rustc_span = { path = "../rust240515/compiler/rustc_span" }
+tracing = "0.1"
+tracing-tree = "0.3.0"
 
-# Copied from `compiler/rustc/Cargo.toml`.
+# Copied from `rust/src/librustdoc/Cargo.toml`.
+[dependencies.tracing-subscriber]
+version = "0.3.3"
+default-features = false
+features = ["fmt", "env-filter", "smallvec", "parking_lot", "ansi"]
+
+# Copied from `rust/compiler/rustc/Cargo.toml`.
 # But only for some targets, it fails for others. Rustc configures this in its CI, but we can't
 # easily use that since we support of-tree builds.
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies.jemalloc-sys]
