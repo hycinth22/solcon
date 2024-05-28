@@ -30,7 +30,7 @@ our_func_def_id: DefId
         // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
         // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
         let ourfunc = {
-            // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
+            // let func_path = &[config::MONITORS_LIB_CRATE_NAME, "this_is_our_mutex_lock_mock_function", "<T>"];
             // let func_def_id = find_def_id_by_pat(tcx, func_path);
             let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
             let func_ty = {
@@ -133,7 +133,7 @@ pub(crate) fn add_after_handler<'tcx>(
         }
         let generic_args = generic_args.unwrap();
         let ourfunc = {
-            // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
+            // let func_path = &[config::MONITORS_LIB_CRATE_NAME, "this_is_our_mutex_lock_mock_function", "<T>"];
             // let our_func_def_id = find_def_id_by_pat(tcx, func_path);
             //dbg!(generic_args);
             let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()

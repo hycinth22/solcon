@@ -24,7 +24,7 @@ prescan_info: &MonitorsInfo,
         // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
         // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
         let ourfunc = {
-            // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
+            // let func_path = &[config::MONITORS_LIB_CRATE_NAME, "this_is_our_mutex_lock_mock_function", "<T>"];
             // let func_def_id = find_def_id_by_pat(tcx, func_path);
             if prescan_info.mutex_lock_before_fn.is_none() {
                 println!("prescan_info.mutex_lock_before_fn.is_none");
@@ -118,7 +118,7 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
         }
         let generic_args = generic_args.unwrap();
         let ourfunc = {
-            // let func_path = &["this_is_our_monitor_function", "this_is_our_mutex_lock_mock_function", "<T>"];
+            // let func_path = &[config::MONITORS_LIB_CRATE_NAME, "this_is_our_mutex_lock_mock_function", "<T>"];
             // let func_def_id = find_def_id_by_pat(tcx, func_path);
             if prescan_info.mutex_lock_after_fn.is_none() {
                 println!("prescan_info.mutex_lock_after_fn.is_none");

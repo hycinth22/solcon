@@ -31,6 +31,7 @@ use rustc_middle::mir::mono::MonoItem;
 use std::path::PathBuf;
 use std::env;
 
+mod config;
 mod check_input;
 mod mirpass;
 pub(crate) mod monitors;
@@ -91,22 +92,20 @@ fn main() {
         };
         rustc_command_line_arguments.push(sysroot_path);
     }
-
-    // note must start with lib & end with .rlib(e.g lib*.rlib)
-    let solcon_monitor_function_lib_crate_name = "this_is_our_monitor_function";
+    // note filepath must start with lib & end with .rlib(e.g lib*.rlib)
     // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
     let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = utils::find_our_monitor_lib() else {
        early_dcx.early_fatal("solcon monitor function rlib not exist")
     };
-
-   // forcely make our monitor lib become dependency of each crate & linked to each crate
-   // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L127
-   // use --extern to specify direct dependency
-   rustc_command_line_arguments.push("--extern".to_owned());
-   rustc_command_line_arguments.push(format!("force:{solcon_monitor_function_lib_crate_name}={solcon_monitor_function_rlib_filepath}"));
-   // because our monitor lib is dependency of each crate, so downstream crate also transmitively dependent on ur monitor lib and search on directories of -L
-   rustc_command_line_arguments.push("-L".to_owned());
-   rustc_command_line_arguments.push(format!("dependency={solcon_monitor_function_rlib_dirpath}"));
+    let solcon_monitors_lib_crate_name = config::MONITORS_LIB_CRATE_NAME;
+    // forcely make our monitor lib become dependency of each crate & linked to each crate
+    // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L127
+    // use --extern to specify direct dependency
+    rustc_command_line_arguments.push("--extern".to_owned());
+    rustc_command_line_arguments.push(format!("force:{solcon_monitors_lib_crate_name}={solcon_monitor_function_rlib_filepath}"));
+    // because our monitor lib is dependency of each crate, so downstream crate also transmitively dependent on ur monitor lib and search on directories of -L
+    rustc_command_line_arguments.push("-L".to_owned());
+    rustc_command_line_arguments.push(format!("dependency={solcon_monitor_function_rlib_dirpath}"));
 
    
     let always_encode_mir: String = "always-encode-mir".into();

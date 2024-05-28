@@ -18,6 +18,7 @@ use rustc_span::{
 
 pub(crate) use crate::utils;
 use crate::monitors::{self, try_match_with_our_function, MonitorsInfo};
+use crate::config;
 
 mod test_target_handler;
 mod mutex_handler;
@@ -36,7 +37,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         let krate = krate.clone();
         if krate != LOCAL_CRATE {
             let crate_name = tcx.crate_name(krate);
-            if crate_name.as_str() != "this_is_our_monitor_function" {
+            if crate_name.as_str() != config::MONITORS_LIB_CRATE_NAME {
                 info!("skip mismatch crate name {crate_name}");
                 continue;
             }

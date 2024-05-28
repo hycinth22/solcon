@@ -7,6 +7,7 @@ use rustc_span::DUMMY_SP;
 use rustc_span::def_id::{CrateNum, DefId};
 use rustc_hir::definitions::DefPath;
 use tracing::{trace, info};
+use crate::config;
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn jemalloc_magic() {
@@ -76,8 +77,7 @@ pub fn find_our_monitor_lib() -> Option<(String, String)>  {
         return Some((lib_path, dir_path));
     }
     let current_dir = env::current_dir().ok()?;
-    const LIB_FILE_NAME :&str = "this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib";
-    let lib_file_path = current_dir.join(LIB_FILE_NAME);
+    let lib_file_path = current_dir.join(config::MONITORS_LIB_DEFAULT_FILEPATH);
     if lib_file_path.exists() {
         return Some((String::from(lib_file_path.to_str()?), get_parent_path(lib_file_path.to_str()?)?));
     }
