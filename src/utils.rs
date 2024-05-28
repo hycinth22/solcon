@@ -375,3 +375,38 @@ pub fn alloc_unit_local<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::
     let new_local= local_decls.push(local_decl);
     return new_local
 }
+
+pub fn is_fn_like_def(tcx: TyCtxt<'_>, def_id: &DefId) -> bool {
+    use rustc_hir::def::DefKind::*;
+    use rustc_hir::def::CtorKind;
+    let def_kind = tcx.def_kind(def_id);
+    match def_kind {
+        Fn | AssocFn | Closure => true,
+        // Refers to the struct or enum variant’s constructor.
+        Ctor(_ctor_of, ctor_kind) => {
+            match ctor_kind{
+                CtorKind::Fn => false, // Constructor function automatically created by a tuple struct/variant.
+                CtorKind::Const => false, // Constructor constant automatically created by a unit struct/variant.
+            }
+        }
+        Mod  | Struct| Union | Enum | Variant | Trait 
+        | TyAlias // Type alias: type Foo = Bar;
+        | ForeignTy // Type from an extern block.
+        | TraitAlias // Trait alias: trait IntIterator = Iterator<Item = i32>;
+        | AssocTy // Associated type: trait MyTrait { type Assoc; }
+        | TyParam // Type parameter: the T in struct Vec<T> { ... }
+        | Const 
+        | ConstParam // Constant generic parameter: struct Foo<const N: usize> { ... }
+        | Static{..} 
+        | AssocConst // Associated constant: trait MyTrait { const ASSOC: usize; }
+        | Macro(..) | ExternCrate | Use
+        | ForeignMod 
+        | AnonConst // Anonymous constant, e.g. the 1 + 2 in [u8; 1 + 2]
+        | InlineConst // An inline constant, e.g. const { 1 + 2 }
+        | OpaqueTy // Opaque type, aka impl Trait.
+        | Field // A field in a struct, enum or union.
+        | LifetimeParam // Lifetime parameter: the 'a in struct Foo<'a> { ... }
+        | GlobalAsm // A use of global_asm!.
+        | Impl{..} => false
+    }
+}
