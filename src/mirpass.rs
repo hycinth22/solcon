@@ -38,7 +38,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         if krate != LOCAL_CRATE {
             let crate_name = tcx.crate_name(krate);
             if crate_name.as_str() != config::MONITORS_LIB_CRATE_NAME {
-                info!("skip mismatch crate name {crate_name}");
+                debug!("skip mismatch crate name {crate_name}");
                 continue;
             }
             let crate_dep_kind = tcx.dep_kind(krate);
@@ -83,20 +83,20 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
             &mut *mutable_ptr
         };
         // let def_id = body.source.def_id();
-        debug!("found body instance of {}", def_path_str);
+        trace!("found body instance of {}", def_path_str);
 
         if tcx.is_foreign_item(def_id) {
             // 跳过外部函数(例如 extern "C")
-            trace!("skip body instance of {} because is_foreign_item", def_path_str);
+            debug!("skip body instance of {} because is_foreign_item", def_path_str);
             continue;
         }
         // Skip promoted src
         if body.source.promoted.is_some() {
-            trace!("skip body instance of {} because promoted.is_some", def_path_str);
+            debug!("skip body instance of {} because promoted.is_some", def_path_str);
             continue;
         }
         if is_filtered_def_path(tcx, &def_path) {
-            trace!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
+            debug!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
             continue;
         }
         // dont know why enable here leads to undefined symbol. unfinished
@@ -104,7 +104,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         //     warn!("skip body instance of {:?} because not is_codegened_item", def_path_str);
         //     continue;
         // }
-        debug!("visiting function body of {}", def_path_str);
+        trace!("visiting function body of {}", def_path_str);
         inject_for_bb(tcx, body, &monitors);
     }
 }
@@ -152,6 +152,7 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
         "libc"
     ];
     if FILTERED_CRATES.contains(&crate_name_str) {
+        debug!("filtered crate_name {crate_name_str}");
         return true;
     } else {
         debug!("unfiltered crate_name {crate_name_str}");

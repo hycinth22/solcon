@@ -288,7 +288,7 @@ impl rustc_driver::Callbacks for Callbacks {
 
             // Build
             let (items, cgus) = tcx.collect_and_partition_mono_items(());
-            info!("cgus.len {}", cgus.len());
+            info!("code generation units nums #{}", cgus.len());
             let instances: Vec<Instance<'tcx>> = cgus
             .iter()
             .flat_map(|cgu| {
