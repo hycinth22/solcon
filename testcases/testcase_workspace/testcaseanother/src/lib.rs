@@ -4,7 +4,13 @@ use std::sync::Mutex;
 use std::ptr::addr_of;
 
 pub fn generic_fun<T: ?Sized>(x: &T) -> () {
+    println!("hello from generic_fun");
     println!("call generic_fun{:?}", addr_of!(*x));
+    let m = Mutex::new(x);
+    let mut guard = m.lock().unwrap();
+    drop(guard);
+    let guard = m.lock().unwrap();
+    println!("bye from generic_fun");
 }
 
 pub fn fothercrate() {
