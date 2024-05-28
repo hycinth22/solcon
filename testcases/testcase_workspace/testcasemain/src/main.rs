@@ -1,4 +1,5 @@
-// extern crate this_is_our_monitor_function;
+#![allow(unused_variables)]
+#![allow(unused_mut)]
 
 use std::sync::Mutex;
 
@@ -12,10 +13,10 @@ fn f() {
 
     println!("droped");
 
-    // let m = Mutex::new(0);
-    // let mut guard = m.lock().unwrap();
-    // *guard = 111;
-    // println!("{}", *guard);
+    let m = Mutex::new(0);
+    let mut guard = m.lock().unwrap();
+    *guard = 111;
+    println!("{}", *guard);
 } 
 
 fn f2() {
@@ -34,16 +35,6 @@ fn f222() {
     println!("Hello, f222!");
 }
 
-fn unused() {
-    // this_is_our_monitor_function::this_is_our_mutex_lock_before_handle_function(unsafe{
-    //     &*(0 as *const Mutex<i32>)
-    // });
-    // this_is_our_monitor_function::this_is_our_mutex_lock_before_handle_function(unsafe{
-    //     &*(0 as *const Mutex<bool>)
-    // });
-    // this_is_our_monitor_function::this_is_non_generic_func(1i32);
-}
-
 fn main() {
     f();
     f2();
@@ -59,6 +50,4 @@ fn main() {
     testcase_anothercrate::fothercrate();
     testcase_anothercrate::generic_fun(&123);
     testcase_mutex_dyn_type::ff();
-    testcase_env_logger::ff();
-    unused();
 }
