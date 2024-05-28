@@ -22,7 +22,7 @@ extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
 
-use tracing::{info, trace};
+use tracing::{info, trace, debug};
 use rustc_driver::Compilation;
 use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
@@ -166,7 +166,7 @@ struct Callbacks {
     need_init_logger: bool,
     file_name: String,
     output_directory: PathBuf,
-    test_run: bool,
+    test_mode: bool,
 }
 
 impl Callbacks {
@@ -175,7 +175,7 @@ impl Callbacks {
             need_init_logger,
             file_name: String::new(),
             output_directory: PathBuf::default(),
-            test_run: false,
+            test_mode: false,
         }
     }
 }
@@ -189,11 +189,11 @@ impl rustc_driver::Callbacks for Callbacks {
         self.file_name = config.input.source_name().prefer_remapped_unconditionaly().to_string();
         info!("Processing input file: {}", self.file_name);
         for c in &config.crate_check_cfg {
-            info!("config.crate_check_cfg {c}");
+            debug!("config.crate_check_cfg {c}");
         }
         if config.opts.test {
-            info!("in test only mode");
-            self.test_run = true;
+            info!("solcon_instrumenter is running in test mode");
+            self.test_mode = true;
         }
         match &config.output_dir {
             None => {
@@ -303,12 +303,7 @@ impl rustc_driver::Callbacks for Callbacks {
             .collect();
             dcx.abort_if_errors();
         });
-        if self.test_run {
-            // We avoid code gen for test cases because LLVM is not used in a thread safe manner.
-            Compilation::Stop
-        } else {
-            Compilation::Continue
-        }
+        Compilation::Continue
     }
 }
 

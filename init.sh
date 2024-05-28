@@ -1,6 +1,7 @@
 export RUSTC_LOG="rustc_metadata=debug,solcon_instrumenter=debug"
 export RUSTC_WRAPPER="/home/hycinth/src/solcon_instrumenter/target/debug/solcon_instrumenter"
 export SOLCON_MONITOR_LIB_PATH="/home/hycinth/src/solcon_instrumenter/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
+export RUSTDOCFLAGS="--extern this_is_our_monitor_function=$SOLCON_MONITOR_LIB_PATH -L dependency=$(dirname $SOLCON_MONITOR_LIB_PATH)"
 
 #export TOOLCHAIN_NAME="nightly"
 #export TOOLCHAIN_NAME="stage1"
