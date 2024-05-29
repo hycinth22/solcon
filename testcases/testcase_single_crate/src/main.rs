@@ -1,8 +1,9 @@
-mod this_is_our_monitor_function;
-mod target;
-mod mutex;
+#![allow(incomplete_include)]
+
+mod test_mutex;
 
 use std::sync::Mutex;
+use test_mutex::main as mutexmain;
 
 fn f() {
     let m = Mutex::new(0);
@@ -39,8 +40,6 @@ fn f222() {
 
 fn main() {
     //testcase_anothercrate::generic_fun(&123);
-    target::main();
-    mutex::main();
     f();
     f2();
     println!("Hello, world!");
