@@ -17,7 +17,7 @@ use rustc_span::{
 };
 
 pub(crate) use crate::utils;
-use crate::monitors::{self, try_match_with_our_function, MonitorsInfo};
+use crate::monitors_finder::{self, MonitorsFinder, MonitorsInfo};
 use crate::config;
 
 mod test_target_handler;
@@ -55,7 +55,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
                 let def_kind = tcx.def_kind(def_id);
                 info!("found external {def_kind:?} : {}", def_path_str);
                 if matches!(def_kind, DefKind::Fn) {
-                    try_match_with_our_function(tcx, &def_id, &mut monitors);
+                    monitors.try_match_with_our_function(tcx, &def_id);
                 }
             }
         }

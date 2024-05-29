@@ -36,7 +36,7 @@ use std::path::PathBuf;
 mod config;
 mod check_input;
 mod mirpass;
-pub(crate) mod monitors;
+pub(crate) mod monitors_finder;
 mod utils;
 
 

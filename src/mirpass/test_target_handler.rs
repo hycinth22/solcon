@@ -7,7 +7,7 @@ use rustc_middle::mir::{self, BasicBlock, BasicBlockData, BorrowKind, ConstOpera
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
 
-use crate::{monitors::MonitorsInfo};
+use crate::monitors_finder::MonitorsInfo;
 use super::utils::{alloc_unit_local, get_function_generic_args};
 
 pub(crate) fn add_before_handler<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
