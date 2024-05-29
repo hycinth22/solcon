@@ -41,7 +41,7 @@ pub fn generate_impl_monitors_finder_from_monitors_info(_attr: TokenStream, item
             let branch = quote! {
                 #def_path => {
                     self.#ident = Some(def_id);
-                    info!("configure info.#ident");
+                    info!(concat!("configure monitors.", stringify!(#ident)));
                 }
             };
             Some(branch)
