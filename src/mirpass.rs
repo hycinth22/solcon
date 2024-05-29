@@ -21,7 +21,21 @@ use crate::monitors_finder::{self, MonitorsFinder, MonitorsInfo};
 use crate::config;
 
 mod test_target_handler;
-mod mutex_handler;
+mod mutex_lock_handler;
+
+pub trait FunctionCallInstrumenter {
+    fn target_function(&self) -> &'static str;
+    fn add_before_handler<'tcx>(&self, 
+        tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
+        this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock, 
+        monitors: &MonitorsInfo,
+    ) -> Option< HashMap<BasicBlock, BasicBlockData<'tcx>> >;
+    fn add_after_handler<'tcx>(&self, 
+        tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
+        this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock, 
+        monitors: &MonitorsInfo,
+    ) -> Option< HashMap<BasicBlock, BasicBlockData<'tcx>> >;
+}
 
 pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     info!("our pass is running");
@@ -104,7 +118,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         //     warn!("skip body instance of {:?} because not is_codegened_item", def_path_str);
         //     continue;
         // }
-        trace!("visiting function body of {}", def_path_str);
+        debug!("try inject for bb of function body of {}", def_path_str);
         inject_for_bb(tcx, body, &monitors);
     }
 }
@@ -161,6 +175,10 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
 }
 
 fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: &MonitorsInfo) {
+    let function_call_instrumenters : [&dyn FunctionCallInstrumenter; 2] = [
+        &test_target_handler::TestTargetCallHandler{},
+        &mutex_lock_handler::MutexLockCallHandler{}, 
+    ];
     // 遍历基本块
     let bbs = body.basic_blocks.as_mut();
     let mut insert_before_call = HashMap::new();
@@ -177,20 +195,14 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: 
             }
             let func_def_path_str = func_def_path_str.unwrap();
             debug!("Found call to function: {:?}", func_def_path_str);
-            match func_def_path_str.as_str() {
-                "this_is_our_test_target_mod::this_is_our_test_target_function"  => {
-                    info!("Found call to this_is_our_test_target_function: {:?} (should instrument before)", func_def_path_str);
-                    let Some(func_def_id) = monitors.test_target_before_fn else { warn!("monitors.test_target_before_fn.is_none"); continue; };
-                    let insertblocks = test_target_handler::add_before_handler(tcx, &mut body.local_decls, this_terminator, block, func_def_id);
-                    insert_before_call.extend(insertblocks);
+            for i in function_call_instrumenters {
+                let target_function = i.target_function();
+                if func_def_path_str == target_function {
+                    info!("Found call to {} in {:?}  (should instrument before)", target_function, func_def_path_str);
+                    if let Some(insertblocks) = i.add_before_handler(tcx, &mut body.local_decls, this_terminator, block, &monitors) {
+                        insert_before_call.extend(insertblocks);
+                    }
                 }
-                "std::sync::Mutex::<T>::lock" => {
-                    info!("Found call to mutex lock: {:?}  (should instrument before)", func_def_path_str);
-                    let Some(func_def_id) = monitors.mutex_lock_before_fn else { warn!("monitors.mutex_lock_before_fn.is_none"); continue; };
-                    let insertblocks = mutex_handler::add_mutex_lock_before_handler(tcx, &mut body.local_decls, this_terminator, block, func_def_id);
-                    insert_before_call.extend(insertblocks);
-                }
-                _ => {}
             }
         }
     }
@@ -216,20 +228,15 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: 
             }
             let func_def_path_str = func_def_path_str.unwrap();
             debug!("Found call to function: {:?}", func_def_path_str);
-            match func_def_path_str.as_str() {
-                "this_is_our_test_target_mod::this_is_our_test_target_function" => {
-                    info!("Found call to this_is_our_test_target_function: {:?} (should instrument after)", func_def_path_str);
-                    let Some(func_def_id) = monitors.test_target_after_fn else { warn!("monitors.test_target_after_fn.is_none"); continue; };
-                    let insertblocks = test_target_handler::add_after_handler(tcx, &mut body.local_decls, this_terminator, block, func_def_id);
-                    insert_after_call.extend(insertblocks);
+            for i in function_call_instrumenters.iter() {
+                let target_function = i.target_function();
+                if func_def_path_str == target_function {
+                    info!("Found call to {} in {:?}  (should instrument after)", target_function, func_def_path_str);
+                    let Some(func_def_id) = monitors.mutex_lock_before_fn else { warn!("monitors.mutex_lock_before_fn.is_none"); continue; };
+                    if let Some(insertblocks) = i.add_after_handler(tcx, &mut body.local_decls, this_terminator, block, &monitors) {
+                        insert_after_call.extend(insertblocks);
+                    }
                 }
-                "std::sync::Mutex::<T>::lock" => {
-                    info!("Found call to mutex lock: {:?}  (should instrument after)", func_def_path_str);
-                    let Some(func_def_id) = monitors.mutex_lock_after_fn else { warn!("monitors.mutex_lock_after_fn.is_none"); continue; };
-                    let insertblocks = mutex_handler::add_mutex_lock_after_handler(tcx, &mut body.local_decls, this_terminator, block, func_def_id);
-                    insert_after_call.extend(insertblocks);
-                }
-                _ => {}
             }
         }
     }
