@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use rustc_middle::mir::{self, BasicBlock, BasicBlockData, BorrowKind, ConstOperand, Local, LocalDecl, MutBorrowKind, Operand, Place, ProjectionElem, Rvalue, SourceInfo, Statement, StatementKind, Terminator, TerminatorKind};
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
-
+use rustc_span::def_id::DefId;
 use crate::{monitors_finder::MonitorsInfo, utils::{alloc_unit_local, get_function_generic_args}};
 
 pub(crate) fn add_mutex_lock_before_handler<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
-prescan_info: &MonitorsInfo, 
-/* call: &mut TerminatorKind<'tcx>,  */this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock) 
+this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock,
+our_func_def_id: DefId
+) 
 -> HashMap<BasicBlock, BasicBlockData<'tcx> >
 {
     let mut insert_before_call = HashMap::new();
@@ -24,40 +25,20 @@ prescan_info: &MonitorsInfo,
         // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
         // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
         let ourfunc = {
-            // let func_path = &[config::MONITORS_LIB_CRATE_NAME, "this_is_our_mutex_lock_mock_function", "<T>"];
-            // let func_def_id = find_def_id_by_pat(tcx, func_path);
-            if prescan_info.mutex_lock_before_fn.is_none() {
-                println!("prescan_info.mutex_lock_before_fn.is_none");
-                return insert_before_call;
-            }
-            let func_def_id = prescan_info.mutex_lock_before_fn.unwrap();
-            let is_generic_func = tcx.generics_of(func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+            let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
             let func_ty = {
-                 let binder = tcx.type_of(func_def_id);
-                 let generics = tcx.generics_of(func_def_id);
+                 let binder = tcx.type_of(our_func_def_id);
+                 let generics = tcx.generics_of(our_func_def_id);
                  if is_generic_func{
                      binder.instantiate(tcx, generic_args)
                  } else {
                      binder.instantiate_identity()
                  }
             };
-            let const_ = mir::Const::zero_sized(func_ty);
-            // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
-            // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
-            //     tcx,
-            //     ty::ParamEnv::reveal_all(),
-            //     ty::EarlyBinder::bind(func_ty),
-            // ));
-            // Operand::Val(val, func_ty)
-            // Operand::Constant(Box::new(ConstOperand {
-            //     span: DUMMY_SP,
-            //     const_: const_,
-            //     user_ty: None,
-            // }))
             if is_generic_func {
-                Operand::function_handle(tcx, func_def_id, generic_args, fn_span.clone())
+                Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
             } else {
-                Operand::function_handle(tcx, func_def_id, [], fn_span.clone())
+                Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
             }
         };
         // this_terminator.target will be modify later because new block have not been inserted yet
@@ -101,7 +82,9 @@ prescan_info: &MonitorsInfo,
 }
 
 pub(crate) fn add_mutex_lock_after_handler<'tcx>(
-    tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, prescan_info: &MonitorsInfo, this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock
+    tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
+    this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock,
+    our_func_def_id: DefId
 ) -> HashMap<BasicBlock, BasicBlockData<'tcx> >
 {
     // 在函数调用之后插入我们的函数调用需要
@@ -118,41 +101,21 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
         }
         let generic_args = generic_args.unwrap();
         let ourfunc = {
-            // let func_path = &[config::MONITORS_LIB_CRATE_NAME, "this_is_our_mutex_lock_mock_function", "<T>"];
-            // let func_def_id = find_def_id_by_pat(tcx, func_path);
-            if prescan_info.mutex_lock_after_fn.is_none() {
-                println!("prescan_info.mutex_lock_after_fn.is_none");
-                return insert_after_call;
-            }
-            let func_def_id = prescan_info.mutex_lock_after_fn.unwrap();
             // dbg!(generic_args);
-            let is_generic_func = tcx.generics_of(func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+            let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
             let func_ty = {
-                let binder = tcx.type_of(func_def_id);
-                let generics = tcx.generics_of(func_def_id);
+                let binder = tcx.type_of(our_func_def_id);
+                let generics = tcx.generics_of(our_func_def_id);
                 if is_generic_func{
                     binder.instantiate(tcx, generic_args)
                 } else {
                     binder.instantiate_identity()
                 }
             };
-            let const_ = mir::Const::zero_sized(func_ty);
-            // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
-            // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
-            //     tcx,
-            //     ty::ParamEnv::reveal_all(),
-            //     ty::EarlyBinder::bind(func_ty),
-            // ));
-            // dbg!(func_ty);
-            // Operand::Constant(Box::new(ConstOperand {
-            //     span: DUMMY_SP,
-            //     const_: const_,
-            //     user_ty: None,
-            // }))
             if is_generic_func {
-                Operand::function_handle(tcx, func_def_id, generic_args, fn_span.clone())
+                Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
             } else {
-                Operand::function_handle(tcx, func_def_id, [], fn_span.clone())
+                Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
             }
         };
 
@@ -185,35 +148,6 @@ pub(crate) fn add_mutex_lock_after_handler<'tcx>(
                 }
             }
 
-            // 不能直接clone，因为参数可能已被move掉
-            // for arg in &mut our_args {
-            //     if let Operand::Move(place) = arg.node {
-            //         let arg_ty = body.local_decls[place.local].ty;
-            //         // 如果原参数是引用被move掉了，我们可以重新创建新的引用。
-            //         dbg!(arg_ty.kind());
-            //         if let TyKind::Ref(_, ty, mutability) = arg_ty.kind() {
-            //             let local_decl = LocalDecl::new(arg_ty, DUMMY_SP);
-            //             let new_local= body.local_decls.push(local_decl);
-            //             arg.node = Operand::Move(Place::from(new_local));
-                        
-            //             let local_reref_assign_statement = Statement{
-            //                 source_info: SourceInfo::outermost(DUMMY_SP),
-            //                 kind: StatementKind::Assign(
-            //                     Box::new((place_destination_ref, Rvalue::Ref(
-            //                         tcx.lifetimes.re_erased,
-            //                         BorrowKind::Shared,
-            //                         refed_place, // fuck!!! here need def-use analysis to get it
-            //                     )))
-            //                 ),
-            //             };
-            //             statements.push(local_reref_assign_statement);
-            //             println!("recreate ref for after handle because moved");
-            //         } else {
-            //             // 如果原参数是对象被move掉了，我们无法再访问此对象。
-            //             println!("after handle cannot access one param because moved"); //（此处可能需要逐个api考虑如何处理）（再想想这里如何处理？）
-            //         }
-            //     }
-            // }
             our_args.push(Spanned{
                 node: Operand::Move(place_destination_ref),
                 span: DUMMY_SP,
