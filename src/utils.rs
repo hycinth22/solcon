@@ -363,6 +363,24 @@ pub fn alloc_unit_local<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::
     return new_local
 }
 
+pub fn instantiate_our_func<'tcx>(tcx: TyCtxt<'tcx>, our_func_def_id: DefId, generic_args: &'tcx GenericArgs<'tcx>, fn_span: rustc_span::Span) -> Operand<'tcx> {
+    let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
+    let func_ty = {
+         let binder = tcx.type_of(our_func_def_id);
+         let generics = tcx.generics_of(our_func_def_id);
+         if is_generic_func{
+             binder.instantiate(tcx, generic_args)
+         } else {
+             binder.instantiate_identity()
+         }
+    };
+    if is_generic_func {
+        Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
+    } else {
+        Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
+    }
+}
+
 pub fn is_fn_like_def(tcx: TyCtxt<'_>, def_id: &DefId) -> bool {
     use rustc_hir::def::DefKind::*;
     use rustc_hir::def::CtorKind;

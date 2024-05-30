@@ -5,7 +5,7 @@ use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{source_map::Spanned, DUMMY_SP};
 use rustc_span::def_id::DefId;
 use crate::{mirpass::FunctionCallInstrumenter, monitors_finder::MonitorsInfo, utils::{alloc_unit_local, get_function_generic_args}};
-
+use crate::utils;
 pub struct MutexLockCallHandler{}
 
 impl FunctionCallInstrumenter for MutexLockCallHandler{
@@ -34,23 +34,7 @@ impl FunctionCallInstrumenter for MutexLockCallHandler{
             // 在函数调用之前插入我们的函数调用需要
             // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
             // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
-            let ourfunc = {
-                let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
-                let func_ty = {
-                     let binder = tcx.type_of(our_func_def_id);
-                     let generics = tcx.generics_of(our_func_def_id);
-                     if is_generic_func{
-                         binder.instantiate(tcx, generic_args)
-                     } else {
-                         binder.instantiate_identity()
-                     }
-                };
-                if is_generic_func {
-                    Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
-                } else {
-                    Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
-                }
-            };
+            let ourfunc = utils::instantiate_our_func(tcx, our_func_def_id, generic_args, fn_span.clone());
             // this_terminator.target will be modify later because new block have not been inserted yet
             let mut our_args = {
                 // 不能直接clone，因为我们可能会错误地提前move参数，应该由原来的函数调用move它，我们更改所有move为copy（如果参数没有实现copy呢？考虑把所有参数引用化？）
@@ -111,25 +95,7 @@ impl FunctionCallInstrumenter for MutexLockCallHandler{
                 return None;
             }
             let generic_args = generic_args.unwrap();
-            let ourfunc = {
-                // dbg!(generic_args);
-                let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
-                let func_ty = {
-                    let binder = tcx.type_of(our_func_def_id);
-                    let generics = tcx.generics_of(our_func_def_id);
-                    if is_generic_func{
-                        binder.instantiate(tcx, generic_args)
-                    } else {
-                        binder.instantiate_identity()
-                    }
-                };
-                if is_generic_func {
-                    Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
-                } else {
-                    Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
-                }
-            };
-    
+            let ourfunc = utils::instantiate_our_func(tcx, our_func_def_id, generic_args, fn_span.clone());
             // 为了传入返回值，先构造一条创建引用的statement并插到我们的函数调用前
             let ty_dest = local_decls[destination.local].ty;
             let local_decl = LocalDecl::new(Ty::new_mut_ref(tcx, tcx.lifetimes.re_erased, ty_dest), DUMMY_SP);

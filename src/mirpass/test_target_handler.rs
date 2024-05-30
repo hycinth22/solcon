@@ -10,6 +10,7 @@ use rustc_span::{source_map::Spanned, DUMMY_SP};
 use crate::monitors_finder::MonitorsInfo;
 use super::utils::{alloc_unit_local, get_function_generic_args};
 use crate::mirpass::FunctionCallInstrumenter;
+use crate::utils;
 
 pub struct TestTargetCallHandler{}
 
@@ -38,35 +39,8 @@ impl FunctionCallInstrumenter for TestTargetCallHandler{
             // 在函数调用之前插入我们的函数调用需要
             // 1 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便返回后继续在新块执行原调用
             // 2. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
-            let ourfunc = {
-                let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
-                let func_ty = {
-                    let binder = tcx.type_of(our_func_def_id);
-                    let generics = tcx.generics_of(our_func_def_id);
-                    if is_generic_func{
-                        binder.instantiate(tcx, generic_args)
-                    } else {
-                        binder.instantiate_identity()
-                    }
-                };
-                // let instance = tcx.resolve_instance(tcx.param_env(func_def_id).and((func_def_id, generic_args))).unwrap().unwrap();
-                // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
-                //     tcx,
-                //     ty::ParamEnv::reveal_all(),
-                //     ty::EarlyBinder::bind(func_ty),
-                // ));
-                // Operand::Val(val, func_ty)
-                // Operand::Constant(Box::new(ConstOperand {
-                //     span: DUMMY_SP,
-                //     const_: const_,
-                //     user_ty: None,
-                // }))
-                if is_generic_func {
-                    Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
-                } else {
-                    Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
-                }
-            };
+
+            let ourfunc = utils::instantiate_our_func(tcx, our_func_def_id, generic_args, fn_span.clone());
             // this_terminator.target will be modify later because new block have not been inserted yet
             let mut our_args = {
                 let mut our_args = args.clone();
@@ -141,38 +115,7 @@ impl FunctionCallInstrumenter for TestTargetCallHandler{
                 return None;
             }
             let generic_args = generic_args.unwrap();
-            let ourfunc = {
-                //dbg!(generic_args);
-                let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
-                let func_ty = {
-                    let binder = tcx.type_of(our_func_def_id);
-                    let generics = tcx.generics_of(our_func_def_id);
-                    if is_generic_func{
-                        binder.instantiate(tcx, generic_args)
-                    } else {
-                        binder.instantiate_identity()
-                    }
-                };
-                let const_ = mir::Const::zero_sized(func_ty);
-                // let instance = tcx.resolve_instance(tcx.param_env(our_func_def_id).and((our_func_def_id, generic_args))).unwrap().unwrap();
-                // let const_ = mir::Const::zero_sized(instance.instantiate_mir_and_normalize_erasing_regions(
-                //     tcx,
-                //     ty::ParamEnv::reveal_all(),
-                //     ty::EarlyBinder::bind(func_ty),
-                // ));
-                //dbg!(func_ty);
-                // Operand::Constant(Box::new(ConstOperand {
-                //     span: DUMMY_SP,
-                //     const_: const_,
-                //     user_ty: None,
-                // }))
-                if is_generic_func {
-                    Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
-                } else {
-                    Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
-                }
-            };
-    
+            let ourfunc = utils::instantiate_our_func(tcx, our_func_def_id, generic_args, fn_span.clone());
             // 为了传入返回值，先构造一条创建引用的statement并插到我们的函数调用前
             let ty_dest = local_decls[destination.local].ty;
             let local_decl = LocalDecl::new(Ty::new_mut_ref(tcx, tcx.lifetimes.re_erased, ty_dest), fn_span.clone());
