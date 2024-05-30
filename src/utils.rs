@@ -135,43 +135,30 @@ pub fn is_crate_def_id(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
 
 pub fn get_function_path<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<DefPath> {
     // 通过Operand获取函数调用的名称
-    return get_function_path_from_ty(tcx, &get_operand_ty( local_decls, operand));
+    return get_function_path_from_ty(tcx, &get_operand_ty( tcx, local_decls, operand));
 }
 
 pub fn get_function_path_str<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<String> {
     // 通过Operand获取函数调用的名称
-    return get_function_path_str_from_ty(tcx, &get_operand_ty( local_decls, operand));
+    return get_function_path_str_from_ty(tcx, &get_operand_ty( tcx, local_decls, operand));
 }
 
-pub fn get_function_generic_args<'tcx, 'operand>(local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
+pub fn get_function_generic_args<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
     // 通过Operand获取函数调用的GenericArg
-    return get_function_generic_args_from_ty(&get_operand_ty(local_decls, operand));
+    return get_function_generic_args_from_ty(&get_operand_ty(tcx, local_decls, operand));
 }
 
-pub fn get_operand_ty<'tcx>(local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &Operand<'tcx>) -> Ty<'tcx> {
+pub fn get_operand_ty<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &Operand<'tcx>) -> Ty<'tcx> {
     match operand {
         Operand::Constant(box ConstOperand { const_, .. }) => {
             match const_ {
-                Const::Ty( ty_const) => {
-                    //trace!("ty!!");
-                    return ty_const.ty();
-                }
-                Const::Unevaluated(_val, ty) => {
-                    //trace!("Unevaluated!!");
-                    return ty.clone();
-                }
-                Const::Val( _val, ty) => {
-                    //dbg!(_val);
-                    //trace!("Val!!");
-                    return ty.clone();
-                }
+                Const::Ty( ty_const) => ty_const.ty(),
+                Const::Unevaluated(_val, ty) => ty.clone(),
+                Const::Val( _val, ty) => ty.clone(),
             }
         }
-        Operand::Copy(place) | Operand::Move(place) => {
-            let ty = local_decls[place.local].ty;
-            // trace!("Copy | Move !!");
-            return ty;
-        }
+        Operand::Copy(place) | Operand::Move(place) => 
+            place.ty(local_decls, tcx).ty,
     }
 }
 

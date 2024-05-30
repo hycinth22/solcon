@@ -29,7 +29,7 @@ impl FunctionCallInstrumenter for TestTargetCallHandler{
         let mut insert_before_call = HashMap::new();
         let call = &mut this_terminator.kind;
         if let TerminatorKind::Call { func, args, destination, target, unwind, call_source, fn_span} = call {
-            let generic_args = get_function_generic_args(local_decls, &func);
+            let generic_args = get_function_generic_args(tcx, local_decls, &func);
             if generic_args.is_none() {
                 println!("generic_args.is_none");
                 return None;
@@ -135,7 +135,7 @@ impl FunctionCallInstrumenter for TestTargetCallHandler{
         let mut insert_after_call = HashMap::new();
         let call = &mut this_terminator.kind;
         if let TerminatorKind::Call { func, args, destination, target, unwind, call_source, fn_span} = call {
-            let generic_args = get_function_generic_args(local_decls, &func);
+            let generic_args = get_function_generic_args(tcx, local_decls, &func);
             if generic_args.is_none() {
                 println!("generic_args.is_none");
                 return None;
