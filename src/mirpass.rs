@@ -10,6 +10,7 @@ use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
 use rustc_middle::middle::exported_symbols::ExportedSymbol;
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::mir::ConstOperand;
+use rustc_middle::mir::patch::MirPatch;
 use rustc_session::cstore::CrateDepKind;
 use rustc_span::{
     def_id::{CrateNum, DefId, DefIndex, LOCAL_CRATE},
@@ -22,6 +23,14 @@ use crate::config;
 
 mod test_target_handler;
 mod mutex_lock_handler;
+mod mutexguard_drop;
+
+pub trait OurMirPass {
+    fn run_pass<'tcx>(&self, 
+        tcx: TyCtxt<'tcx>,
+        body: &Body<'tcx>, monitors: &MonitorsInfo)
+    -> Option< MirPatch<'tcx> >;
+}
 
 pub trait FunctionCallInstrumenter {
     fn target_function(&self) -> &'static str;
@@ -36,6 +45,21 @@ pub trait FunctionCallInstrumenter {
         monitors: &MonitorsInfo,
     ) -> Option< HashMap<BasicBlock, BasicBlockData<'tcx>> >;
 }
+
+pub trait ObjectDropInstrumenter {
+    fn target_ty(&self) -> &'static str;
+    fn add_before_handler<'tcx>(&self, 
+        tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
+        this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock, 
+        monitors: &MonitorsInfo,
+    ) -> Option< MirPatch<'tcx> >;
+    fn add_after_handler<'tcx>(&self, 
+        tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::IndexVec<Local, LocalDecl<'tcx>>, 
+        this_terminator: &mut Terminator<'tcx>, block: rustc_middle::mir::BasicBlock, 
+        monitors: &MonitorsInfo,
+    ) -> Option< MirPatch<'tcx> >;
+}
+
 
 pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
     info!("our pass is running");
@@ -119,7 +143,12 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         //     continue;
         // }
         debug!("try inject for bb of function body of {}", def_path_str);
-        inject_for_bb(tcx, body, &monitors);
+        inject_for_bb(tcx, body, &monitors, &[
+            &test_target_handler::TestTargetCallHandler{},
+            &mutex_lock_handler::MutexLockCallHandler{}, 
+        ], &[
+            &mutexguard_drop::MutexGuardDropPass{},
+        ]);
     }
 }
 
@@ -174,11 +203,10 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
     false
 }
 
-fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: &MonitorsInfo) {
-    let function_call_instrumenters : [&dyn FunctionCallInstrumenter; 2] = [
-        &test_target_handler::TestTargetCallHandler{},
-        &mutex_lock_handler::MutexLockCallHandler{}, 
-    ];
+fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: &MonitorsInfo, 
+    function_call_instrumenters: &[&dyn FunctionCallInstrumenter],
+    our_passes: &[&dyn OurMirPass],
+) {
     // 遍历基本块
     let bbs = body.basic_blocks.as_mut();
     let mut insert_before_call = HashMap::new();
@@ -246,6 +274,13 @@ fn inject_for_bb<'tcx>(tcx: TyCtxt<'tcx>, body: &'tcx mut Body<'tcx>, monitors: 
             *target = Some(newblockindex);
         } else {
             panic!("all terminiator ins insertAfterCall must be TerminatorKind::Call")
+        }
+    }
+
+    for p in our_passes.iter() {
+        let patch = p.run_pass(tcx, body, monitors);
+        if let Some(patch) = patch {
+            patch.apply(body);
         }
     }
 }

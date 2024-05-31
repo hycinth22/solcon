@@ -16,6 +16,11 @@ pub(crate) struct MonitorsInfo {
     pub mutex_lock_before_fn: Option<DefId>,
     #[monitor_defpath = "this_is_our_mutex_lock_after_handle_function"]
     pub mutex_lock_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_mutexguard_drop_before_handle_function"]
+    pub mutexguard_drop_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_mutexguard_drop_after_handle_function"]
+    pub mutexguard_drop_after_fn: Option<DefId>,
 }
 
 pub trait MonitorsFinder {
