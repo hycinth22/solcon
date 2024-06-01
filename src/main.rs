@@ -34,7 +34,8 @@ use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 
 mod config;
-mod check_input;
+#[cfg(feature = "input_filter")]
+mod input_filter;
 mod mirpass;
 pub(crate) mod monitors_finder;
 mod utils;
@@ -311,12 +312,15 @@ impl rustc_driver::Callbacks for Callbacks {
                 dcx.warn("Notice: You have explicitly enabled MIR optimizations!");
             }
 
-            // Check
-            if !check_input::should_process(tcx) {
-                dcx.note(format!("skip to instrument compiling unit {}, because should_process report false", self.file_name));
-                return;
+            #[cfg(feature = "input_filter")]
+            {
+                // filter input
+                if !input_filter::should_process(tcx) {
+                    dcx.note(format!("skip to instrument compiling unit {}, because should_process report false", self.file_name));
+                    return;
+                }
+                dcx.abort_if_errors();
             }
-            dcx.abort_if_errors();
 
             // Transform
             mirpass::run_our_pass(tcx);
