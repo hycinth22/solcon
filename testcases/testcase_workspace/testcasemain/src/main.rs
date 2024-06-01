@@ -48,6 +48,11 @@ fn main() {
         println!("Hello, moveclosure! {}", e);
     };
     testcase_anothercrate::fothercrate();
-    testcase_anothercrate::generic_fun(&123);
+    let a = 123;
+    testcase_anothercrate::generic_fun(&a);
+    testcase_anothercrate::generic_fun(&a);
+    let b = 456;
+    testcase_anothercrate::generic_fun(&b);
+    testcase_anothercrate::generic_fun(&b);
     testcase_mutex_dyn_type::ff();
 }
