@@ -25,10 +25,12 @@ impl<'pass> FunctionCallInstrumenter<'_> for TestTargetCallHandler<'_>{
     fn target_function(&self) -> &'static str {
         "this_is_our_test_target_mod::this_is_our_test_target_function"
     }
+    #[inline]
     fn before_monitor_def_id(&self, monitors: &MonitorsInfo) -> Option<DefId> { 
         let Some(our_func_def_id) = monitors.test_target_before_fn else { warn!("monitors.test_target_before_fn.is_none"); return None; };
         Some(our_func_def_id)
     }
+    #[inline]
     fn after_monitor_def_id(&self, monitors: &MonitorsInfo) -> Option<DefId> { 
         let Some(our_func_def_id) = monitors.test_target_after_fn else { warn!("monitors.test_target_after_fn.is_none"); return None; };
         Some(our_func_def_id)
