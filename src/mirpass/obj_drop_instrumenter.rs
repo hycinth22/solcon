@@ -39,7 +39,7 @@ pub trait ObjectDropInstrumenter {
         let terminator = drop_at_block_data.terminator();
             match &terminator.kind {
                 TerminatorKind::Drop { place, target, unwind, replace} => {
-                    let ty = body.local_decls[place.local].ty;
+                    let ty = place.ty(&body.local_decls, tcx).ty;
                     let TyKind::Adt(adt_def, generic_args) = ty.kind() else {
                         unreachable!();
                     };

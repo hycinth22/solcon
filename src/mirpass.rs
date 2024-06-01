@@ -246,7 +246,7 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
         let terminator = bb_data.terminator();
         match &terminator.kind {
             TerminatorKind::Drop { place, target, unwind, replace} => {
-                let ty = body.local_decls[place.local].ty;
+                let ty = place.ty(&body.local_decls, tcx).ty;
                 if let TyKind::Adt(adt_def, generic_args) = ty.kind() {
                     let ty_def_id = adt_def.did();
                     let ty_def_path_str = tcx.def_path_str(ty_def_id);

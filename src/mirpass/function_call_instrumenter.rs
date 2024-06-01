@@ -115,7 +115,7 @@ pub trait FunctionCallInstrumenter<'pass> {
             // 2. 在我们新生成的基本块中，terminator-kind为call，func为我们的函数，target到当前块的原target
 
             // 为了传入返回值，先构造一条创建引用的statement并插到我们的函数调用前
-            let ty_dest = body.local_decls[destination.local].ty;
+            let ty_dest = destination.ty(&body.local_decls, tcx).ty;
             let local_tmp_ref_to_dest = patch.new_temp(Ty::new_mut_ref(tcx, tcx.lifetimes.re_erased, ty_dest), fn_span.clone());
             let statements = vec![Statement{
                 source_info: SourceInfo::outermost(fn_span.clone()),
