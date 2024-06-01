@@ -136,7 +136,7 @@ fn main() {
     {
         // Tell compiler to generate non optimized mir
         rustc_command_line_arguments.push("-Z".into());
-        rustc_command_line_arguments.push("mir-opt-level=0".into());
+        rustc_command_line_arguments.push("mir-opt-level=1".into());
     }
 
     if !rustc_command_line_arguments
