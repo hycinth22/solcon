@@ -3,7 +3,7 @@
 use std::{hint::black_box, time::Instant};
 
 mod this_is_our_test_target_mod {
-    pub fn this_is_our_test_target_function<T: std::fmt::Display>(x: T) -> i32 {
+    pub fn this_is_our_test_target_function<T: std::fmt::Display>(x: &T) -> i32 {
         println!("this_is_our_test_target_function called once {x}");
         111
     }
