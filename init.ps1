@@ -1,0 +1,10 @@
+$instrumenter_root = $PSScriptRoot
+$env:SOLCON_LOG = "debug"
+$env:SOLCON_LOG_COLOR = "auto"
+$env:SOLCON_MONITOR_LIB_PATH = "$instrumenter_root\this_is_our_monitor_function\target\debug\libthis_is_our_monitor_function.rlib"
+# $env:RUST_SYSROOT = Invoke-Expression "rustc +nightly --print=sysroot"
+# $env:PATH += ";$env:RUST_SYSROOT/lib/"
+$env:RUSTC_LOG = "warn"
+$env:RUSTC_WRAPPER = "$instrumenter_root\target\debug\solcon_instrumenter.exe"
+$env:RUSTFLAGS = "--extern this_is_our_monitor_function=$env:SOLCON_MONITOR_LIB_PATH -L dependency=$(Split-Path $env:SOLCON_MONITOR_LIB_PATH -Parent)"
+$env:RUSTDOCFLAGS = "--extern this_is_our_monitor_function=$env:SOLCON_MONITOR_LIB_PATH -L dependency=$(Split-Path $env:SOLCON_MONITOR_LIB_PATH -Parent)"

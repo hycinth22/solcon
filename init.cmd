@@ -1,0 +1,11 @@
+@echo off
+set "instrumenter_root=%~dp0"
+set "SOLCON_LOG=debug"
+set "SOLCON_LOG_COLOR=auto"
+set "SOLCON_MONITOR_LIB_PATH=%instrumenter_root%this_is_our_monitor_function\target\debug\libthis_is_our_monitor_function.rlib"
+rem for /f "delims=" %%i in ('rustc +nightly --print=sysroot') do set "RUST_SYSROOT=%%i"
+rem set "PATH=%PATH%;%RUST_SYSROOT%\lib"
+set "RUSTC_LOG=warn"
+set "RUSTC_WRAPPER=%instrumenter_root%\target\debug\solcon_instrumenter.exe"
+set "RUSTFLAGS=--extern this_is_our_monitor_function=%SOLCON_MONITOR_LIB_PATH% -L dependency=%~dp0this_is_our_monitor_function"
+set "RUSTDOCFLAGS=--extern this_is_our_monitor_function=%SOLCON_MONITOR_LIB_PATH% -L dependency=%~dp0this_is_our_monitor_function"
