@@ -1,5 +1,7 @@
 use crate::monitors_finder::MonitorsInfo;
 use rustc_span::def_id::DefId;
+use rustc_span::source_map::Spanned;
+use rustc_span::Span;
 use rustc_middle::ty::Ty;
 use rustc_middle::ty::TyCtxt;
 use rustc_middle::mir::BasicBlock;
@@ -16,9 +18,80 @@ use rustc_middle::mir::StatementKind;
 use rustc_middle::mir::SourceInfo;
 use rustc_middle::mir::Terminator;
 use rustc_middle::mir::TerminatorKind;
+use rustc_middle::ty::TyKind;
 use rustc_middle::mir::MutBorrowKind;
 
 use crate::utils;
+
+pub(crate) fn build_monitor_args<'tcx>(patch: &mut MirPatch<'tcx>, 
+    original_args: &Vec<Spanned<Operand<'tcx>>>, no_instantiate_func_args_tys: Vec<&Ty>,
+    tcx: TyCtxt<'tcx>, 
+    body: &Body<'tcx>, assign_ref_block: BasicBlock, 
+    fn_span: &Span,
+ )  -> Vec<Spanned<Operand<'tcx>>> {
+    original_args.iter().zip(no_instantiate_func_args_tys.iter()).map(|(arg, call_arg_ty)| {
+        let arg_ty = arg.node.ty(&body.local_decls, tcx);
+        // 注意：
+        // 1. 不能直接clone Operand::Move，因为如果是move语义传递的参数，则我们会错误地提前move参数（正确行为：应该由原来的函数调用move它）
+        // 2. 也不能简单地将Operand::Move更改为Operand::Copy，因为这会导致在需要drop的类型的同一对象上运行两次deconstructor。
+        // 所以，我们在这里我们仅保持指针类型(reference, raw pointer, fn pointer) 按Copy传递，
+        // 将所有其他参数更改为reference传递。
+        let operand = if call_arg_ty.is_any_ptr() {
+            debug!("call_arg_ty.is_any_ptr()");
+            match arg.node {
+                // 对于reference类型，虽然仅&T实现了Copy trait而&mut T没有Copy trait（https://doc.rust-lang.org/stable/src/core/marker.rs.html#437），
+                // 但是我们在这里仍可以安全地复制&mut T。理由是，Copy trait的意义在于保证可以按位复制不需要deconstructor（drop），而我们的pass运行在optimized_mir（MIR to Binaries阶段）已经运行过analysis阶段，所以可以对任意类型（无论是否实现Copy trait）进行bitwise Copy而不会影响drop elaboration
+                Operand::Move(place) => Operand::Copy(place),
+                Operand::Copy(..) | Operand::Constant(..) => arg.node.clone(),
+            }
+        } else {
+            debug!("!call_arg_ty.is_any_ptr()");
+            // 理论上只要没有Drop trait（特别是实现了Copy trait），我们仍然可以按照Copy直接传递对象，但是这样 1. 可能有效率问题 2. 带来接口的不统一（需要人工查看每个类型是否有Drop trait）
+            // 所以，在这里，我们简单地统一对于将所有非指针类型(非reference, raw pointer, fn pointer)参数转换为reference传递
+            match arg.node {
+                Operand::Move(place) | Operand::Copy(place) => {
+                    let local_temp_ref_to_this_arg = patch.new_temp(Ty::new_imm_ref(tcx, tcx.lifetimes.re_erased, arg_ty), fn_span.clone());
+                    patch.add_assign(patch.terminator_loc(body, assign_ref_block), local_temp_ref_to_this_arg.into(), Rvalue::Ref(
+                        tcx.lifetimes.re_erased,
+                        BorrowKind::Shared,
+                        place.clone(),
+                    ));
+                    Operand::Move(local_temp_ref_to_this_arg.into())
+                }
+                Operand::Constant(..) => {
+                    panic!("how to create ref to constat?")
+                }
+            }
+        };
+        rustc_span::source_map::Spanned {
+            node: operand, 
+            span: arg.span.clone(),
+        }
+    }).collect()
+}
+
+
+ // tyobj.fn_sig() 可以获得函数签名。但倘若tyobj包含了泛型参数，会获得具体化的函数参数类型列表
+ // 本函数可以获得保持泛型的函数参数类型列表
+pub(crate) fn get_no_instantiate_func_args_tys_from_fn_ty<'tcx>(tcx: TyCtxt<'tcx>, func_ty_with_generic_args: &Ty) -> Option<Vec<&'tcx Ty<'tcx>>> {
+    let func_def_id = {
+        let kind = func_ty_with_generic_args.kind();
+        match kind {
+            TyKind::FnDef(def_id, ..) => def_id, // The anonymous type of a function declaration/definition
+            TyKind::Closure(def_id, _args) => def_id, // // The anonymous type of a closure. Used to represent the type of |a| a.
+            TyKind::CoroutineClosure(def_id, _args) => def_id,  // The anonymous type of a closure. Used to represent the type of async |a| a.
+            TyKind::Coroutine(def_id, _args) => def_id, // The anonymous type of a coroutine. Used to represent the type of |a| yield a.
+            TyKind::FnPtr(_) => {
+                warn!("get_no_instantiate_func_args_tys failed: we cannot infer FnPtr point to what");
+                return None;
+            },
+            _ => unreachable!(),
+        }
+    };
+    let func_sig = tcx.fn_sig(func_def_id).skip_binder();
+    let func_sig_arg_tys : Vec<_> = func_sig.inputs().iter().map(|binder| binder.skip_binder() ).collect();
+    Some(func_sig_arg_tys)
+}
 
 pub trait FunctionCallInstrumenter<'pass> {
     fn target_function(&self) -> &'pass str;
@@ -36,6 +109,10 @@ pub trait FunctionCallInstrumenter<'pass> {
         let terminator = &body.basic_blocks[call_at_block].terminator();
         let call = &terminator.kind;
         if let TerminatorKind::Call { func, args, destination, target, unwind, call_source, fn_span} = call {
+            let func_ty_with_generic_args = func.ty(&body.local_decls, tcx);
+            let Some(no_instantiate_func_args_tys) = get_no_instantiate_func_args_tys_from_fn_ty(tcx, &func_ty_with_generic_args) else {
+                return None;
+            };
             let generic_args = utils::get_function_generic_args(tcx, &body.local_decls, &func);
             if generic_args.is_none() {
                 warn!("target_function {} generic_args.is_none", self.target_function());
@@ -46,23 +123,7 @@ pub trait FunctionCallInstrumenter<'pass> {
             // 在函数调用之前插入我们的函数调用需要
             // 1. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
             // 2 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便我们的函数返回后继续在新块执行原调用
-            let mut our_call_args = args.iter().map(|arg| {
-                rustc_span::source_map::Spanned {
-                    node: match arg.node {
-                        // 不能直接clone Operand::Move，因为我们会错误地提前move参数，应该由原来的函数调用move它，我们更改所有move为copy
-                        Operand::Move(place) => {
-                            // 注意点：
-                            // 1.仅&T实现了Copy trait而&mut T没有Copy trait
-                            // 2. Operand::Copy在drop elaboration前要求有Copy trait，之后则无此要求
-                            // 3. 由于我们的pass运行在optimized_mir（MIR to Binaries阶段），而drop elaboration在此之前的analysis阶段进行，
-                            // 所以我们在此处可以对任意类型的变量进行Copy
-                            Operand::Copy(place)
-                        },
-                        Operand::Copy(..) | Operand::Constant(..) => arg.node.clone(),
-                    },
-                    span: arg.span.clone(),
-                }
-            }).collect();
+            let our_call_args = build_monitor_args(&mut patch, args, no_instantiate_func_args_tys, tcx, body, call_at_block, fn_span,);
             let new_bb_run_call = patch.new_block(BasicBlockData {
                 statements: vec![],
                 terminator: Some(Terminator {
@@ -103,6 +164,10 @@ pub trait FunctionCallInstrumenter<'pass> {
         };
         let terminator = &body.basic_blocks[call_at_block].terminator();
         if let TerminatorKind::Call { func, args, destination, target, unwind, call_source, fn_span} = &terminator.kind {
+            let func_ty_with_generic_args = func.ty(&body.local_decls, tcx);
+            let Some(no_instantiate_func_args_tys) = get_no_instantiate_func_args_tys_from_fn_ty(tcx, &func_ty_with_generic_args) else {
+                return None;
+            };
             let generic_args = utils::get_function_generic_args(tcx, &body.local_decls, &func);
             if generic_args.is_none() {
                 warn!("target_function {} generic_args.is_none", self.target_function());
@@ -127,16 +192,9 @@ pub trait FunctionCallInstrumenter<'pass> {
                     )))
                 ),
             }];
-            let mut our_call_args : Vec<_> = args.iter().map(|arg| {
-                rustc_span::source_map::Spanned {
-                    node: match arg.node {
-                        Operand::Move(place) => Operand::Move(place),
-                        Operand::Copy(..) | Operand::Constant(..) => arg.node.clone(),
-                    },
-                    span: arg.span.clone(),
-                }
-            }).collect();
-            our_call_args.push(rustc_span::source_map::Spanned{
+            // Notice: here may cause problems because a reference to obj may be passed after moving and dropping it. This behavior may change in the future.
+            let mut our_call_args = build_monitor_args(&mut patch, args, no_instantiate_func_args_tys, tcx, body, call_at_block, fn_span);
+            our_call_args.push(Spanned{
                 node: Operand::Move(Place::from(local_tmp_ref_to_dest)),
                 span: fn_span.clone(),
             });
@@ -158,16 +216,7 @@ pub trait FunctionCallInstrumenter<'pass> {
             });
             patch.patch_terminator(call_at_block, TerminatorKind::Call{
                 func: func.clone(),
-                // 临时解决方案，阻止原函数调用的操作数move，而等待由我们的after函数去处理
-                args: args.iter().map(|arg| {
-                    rustc_span::source_map::Spanned {
-                        node: match arg.node {
-                            Operand::Move(place) => Operand::Copy(place),
-                            Operand::Copy(..) | Operand::Constant(..) => arg.node.clone(),
-                        },
-                        span: arg.span.clone(),
-                    }
-                }).collect(),
+                args: args.clone(),
                 destination: destination.clone(),
                 target: Some(new_bb_run_our_func_call),
                 unwind: unwind.clone(),
