@@ -135,31 +135,22 @@ pub fn is_crate_def_id(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
 
 pub fn get_function_path<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<DefPath> {
     // 通过Operand获取函数调用的名称
-    return get_function_path_from_ty(tcx, &get_operand_ty( tcx, local_decls, operand));
+    return get_function_path_from_ty(tcx, &operand.ty(local_decls, tcx));
 }
 
 pub fn get_function_path_str<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<String> {
     // 通过Operand获取函数调用的名称
-    return get_function_path_str_from_ty(tcx, &get_operand_ty( tcx, local_decls, operand));
+    return get_function_path_str_from_ty(tcx, &operand.ty(local_decls, tcx));
 }
 
 pub fn get_function_generic_args<'tcx, 'operand>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &'operand Operand<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
     // 通过Operand获取函数调用的GenericArg
-    return get_function_generic_args_from_ty(&get_operand_ty(tcx, local_decls, operand));
+    return get_function_generic_args_from_ty(&operand.ty(local_decls, tcx));
 }
 
+#[deprecated(since = "0.2.0", note = "Use operand.ty(local_decls, tcx) instead")]
 pub fn get_operand_ty<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexVec<Local, LocalDecl<'tcx>>, operand: &Operand<'tcx>) -> Ty<'tcx> {
-    match operand {
-        Operand::Constant(box ConstOperand { const_, .. }) => {
-            match const_ {
-                Const::Ty( ty_const) => ty_const.ty(),
-                Const::Unevaluated(_val, ty) => ty.clone(),
-                Const::Val( _val, ty) => ty.clone(),
-            }
-        }
-        Operand::Copy(place) | Operand::Move(place) => 
-            place.ty(local_decls, tcx).ty,
-    }
+    operand.ty(local_decls, tcx)
 }
 
 pub fn get_function_generic_args_from_ty<'tcx>(ty: &ty::Ty<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
