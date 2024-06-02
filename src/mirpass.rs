@@ -84,7 +84,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         match body_owner_kind {
             BodyOwnerKind::Const{..} | BodyOwnerKind::Static(..) => {
                 warn!("skip body kind {:?}", body_owner_kind);
-                return;
+                continue;
             }
             BodyOwnerKind::Fn | BodyOwnerKind::Closure => {}
         }
