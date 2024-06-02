@@ -1,6 +1,6 @@
 #!/bin/bash
 
-instrumenter_root="$( cd "$(dirname "$0")" ; pwd -P )"
+instrumenter_root=$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" && pwd)
 export SOLCON_LOG="debug"
 export SOLCON_LOG_COLOR="auto"
 export SOLCON_MONITOR_LIB_PATH="$instrumenter_root/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
