@@ -3,7 +3,13 @@
 use std::sync::Mutex;
 use std::ptr::addr_of;
 
+pub fn newfn(x: usize) {
+     println!("newfn, {x}" );
+ } 
+ 
+
 pub fn generic_fun<T: ?Sized>(x: &T) -> () {
+    newfn(77777);
     println!("hello from generic_fun");
     println!("call generic_fun{:?}", addr_of!(*x));
     let m = Mutex::new(x);
