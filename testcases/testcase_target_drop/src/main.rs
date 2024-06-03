@@ -26,7 +26,7 @@ impl Drop for FF {
 
 impl std::fmt::Display for FF {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "ffcontent")
+        write!(f, "ffcontent")
     }
 }
 

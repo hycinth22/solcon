@@ -9,10 +9,10 @@ fn f<T: std::fmt::Display>(m: Arc<Mutex<T>>) {
     drop(guard);
     println!("droped");
 
-    // let m = Mutex::new(0);
-    // let mut guard = m.lock().unwrap();
-    // *guard = 111;
-    // println!("{}", *guard);
+    let m = Mutex::new(0);
+    let mut guard = m.lock().unwrap();
+    *guard = 111;
+    println!("{}", *guard);
 } 
 
 fn f2() {
