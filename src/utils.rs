@@ -406,3 +406,10 @@ pub fn is_fn_like_def(tcx: TyCtxt<'_>, def_id: &DefId) -> bool {
         | Impl{..} => false
     }
 }
+
+pub fn span_to_string(tcx: TyCtxt<'_>, span: rustc_span::Span) -> String {
+    let source_map = tcx.sess.source_map();
+    let str = source_map.span_to_string(span, rustc_span::FileNameDisplayPreference::Remapped);
+    trace!("span_to_string: {str}");
+    str
+}

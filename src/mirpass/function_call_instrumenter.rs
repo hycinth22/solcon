@@ -9,6 +9,9 @@ use rustc_middle::mir::BasicBlockData;
 use rustc_middle::mir::Body;
 use rustc_middle::mir::BorrowKind;
 use rustc_middle::mir::CallSource;
+use rustc_middle::mir::Const;
+use rustc_middle::mir::ConstOperand;
+use rustc_middle::mir::ConstValue;
 use rustc_middle::mir::Operand;
 use rustc_middle::mir::Place;
 use rustc_middle::mir::patch::MirPatch;
@@ -29,7 +32,7 @@ pub(crate) fn build_monitor_args<'tcx>(patch: &mut MirPatch<'tcx>,
     body: &Body<'tcx>, assign_ref_block: BasicBlock, 
     fn_span: &Span,
  )  -> Vec<Spanned<Operand<'tcx>>> {
-    original_args.iter().zip(no_instantiate_func_args_tys.iter()).map(|(arg, call_arg_ty)| {
+    let transfromed_args = original_args.iter().zip(no_instantiate_func_args_tys.iter()).map(|(arg, call_arg_ty)| {
         let arg_ty = arg.node.ty(&body.local_decls, tcx);
         // 注意：
         // 1. 不能直接clone Operand::Move，因为如果是move语义传递的参数，则我们会错误地提前move参数（正确行为：应该由原来的函数调用move它）
@@ -63,11 +66,35 @@ pub(crate) fn build_monitor_args<'tcx>(patch: &mut MirPatch<'tcx>,
                 }
             }
         };
-        rustc_span::source_map::Spanned {
+        Spanned {
             node: operand, 
             span: arg.span.clone(),
         }
-    }).collect()
+    });
+    let mut result = Vec::new();
+    result.push({
+        // build fn_callsite_span_str as first arg
+        let fn_callsite_span_str = utils::span_to_string(tcx, *fn_span);
+        let alloc = rustc_middle::mir::interpret::Allocation::from_bytes_byte_aligned_immutable(fn_callsite_span_str.as_bytes());
+        let const_alloc = tcx.mk_const_alloc(alloc);
+        let const_val = ConstValue::Slice{
+            data: const_alloc,
+            meta: fn_callsite_span_str.len() as u64,
+        };
+        let const_ty = Ty::new_static_str(tcx);
+        Spanned {
+            node: Operand::Constant(
+                Box::new(ConstOperand{
+                    span: fn_span.clone(),
+                    user_ty: None,
+                    const_: Const::Val(const_val, const_ty),
+                }),
+            ), 
+            span: fn_span.clone(),
+        }
+    });
+    result.extend(transfromed_args);
+    result
 }
 
 
@@ -123,7 +150,7 @@ pub trait FunctionCallInstrumenter<'pass> {
             // 在函数调用之前插入我们的函数调用需要
             // 1. 把原函数调用移动到下一个我们新生成的基本块，terminator-kind为call，target到当前块的原target
             // 2 .更改当前块的terminator call的func到我们的函数，target到我们的新块以便我们的函数返回后继续在新块执行原调用
-            let our_call_args = build_monitor_args(&mut patch, args, no_instantiate_func_args_tys, tcx, body, call_at_block, fn_span,);
+            let our_call_args = build_monitor_args(&mut patch, args, no_instantiate_func_args_tys, tcx, body, call_at_block, fn_span);
             let new_bb_run_call = patch.new_block(BasicBlockData {
                 statements: vec![],
                 terminator: Some(Terminator {
