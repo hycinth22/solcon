@@ -29,6 +29,7 @@ pub use obj_drop_instrumenter::ObjectDropInstrumenter;
 mod test_target_handler;
 mod mutex_lock_handler;
 mod mutexguard_drop;
+mod inspect_func_call;
 
 pub trait OurMirPass {
     fn run_pass<'tcx>(&self, 
@@ -122,6 +123,7 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         inject_for_body(tcx, body, &monitors, &[
             &test_target_handler::TestTargetCallHandler::default(),
             &mutex_lock_handler::MutexLockCallHandler::default(), 
+            // &inspect_func_call::FunctionCallInspectorPass::default(),
         ],
         &[
             &mutexguard_drop::MutexGuardDropInstrumenter::default(), 
@@ -141,7 +143,7 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
     }
     let crate_name = tcx.crate_name(*krate);
     let crate_name_str = crate_name.as_str();
-    const FILTERED_CRATES: [&str; 27] = [
+    const FILTERED_CRATES: [&str; 28] = [
         // from rustc library(s)
         "alloc",
         "backtrace",
@@ -170,7 +172,8 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
         "hashbrown",
         "rustc_demangle",
         "std_detect",
-        "libc"
+        "libc",
+        "proc-macro-crate",
     ];
     if FILTERED_CRATES.contains(&crate_name_str) {
         debug!("filtered crate_name {crate_name_str}");
