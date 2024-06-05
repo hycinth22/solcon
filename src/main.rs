@@ -28,6 +28,7 @@ use rustc_driver::Compilation;
 use rustc_session::Session;
 use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
+use rustc_middle::bug;
 use rustc_middle::ty::Instance;
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::util::Providers;
@@ -345,7 +346,7 @@ impl rustc_driver::Callbacks for Callbacks {
             // Transform
             info!("our pass is running");
             if mirpass::MONITORS.get().is_none() {
-                panic!("mirpass::MONITORS.get().is_none(), this should be set when call mirpass::find_all_monitors");
+                bug!("mirpass::MONITORS.get().is_none(), this should be set when call mirpass::find_all_monitors");
             }
             mirpass::START_INSTRUMENT.store(true, std::sync::atomic::Ordering::Release);
             dcx.abort_if_errors();

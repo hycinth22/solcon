@@ -3,6 +3,7 @@ use rustc_span::def_id::DefId;
 use rustc_span::DUMMY_SP;
 use rustc_span::source_map::Spanned;
 use rustc_span::Span;
+use rustc_middle::span_bug;
 use rustc_middle::ty::Ty;
 use rustc_middle::ty::TyCtxt;
 use rustc_middle::ty::TyKind;
@@ -129,7 +130,7 @@ pub trait ObjectDropInstrumenter {
                     });
                     let place_droping_obj = match args[0].node {
                         Operand::Copy(place) | Operand::Move(place) => place,
-                        Operand::Constant(..) => panic!("running drop on constant")
+                        Operand::Constant(..) => span_bug!(*fn_span, "running drop on constant")
                     };
                     let temp_ref_to_droping_obj = Place::from(patch.new_temp(Ty::new_imm_ref(tcx, tcx.lifetimes.re_erased, arg_ty), *fn_span));
                     patch.add_assign(patch.terminator_loc(body, drop_at_block), temp_ref_to_droping_obj, Rvalue::Ref(
@@ -226,7 +227,7 @@ pub trait ObjectDropInstrumenter {
                 let mut patch = MirPatch::new(body);
                 let place_droping_obj = match args[0].node {
                     Operand::Copy(place) | Operand::Move(place) => place,
-                    Operand::Constant(..) => panic!("running drop on constant")
+                    Operand::Constant(..) => span_bug!(*fn_span, "running drop on constant")
                 };
                 let temp_ref_to_droping_obj = Place::from(patch.new_temp(Ty::new_imm_ref(tcx, tcx.lifetimes.re_erased, arg_ty), *fn_span));
                 patch.add_assign(patch.terminator_loc(body, drop_at_block), temp_ref_to_droping_obj, Rvalue::Ref(
