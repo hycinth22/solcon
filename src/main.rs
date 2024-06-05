@@ -7,7 +7,6 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(dead_code)]
-#![allow(unused_mut)]
 
 #[macro_use]
 extern crate tracing; // shared from rustc
@@ -356,9 +355,9 @@ impl rustc_driver::Callbacks for Callbacks {
             dcx.abort_if_errors();
 
             // Build
-            let (items, cgus) = tcx.collect_and_partition_mono_items(());
+            let (_items, cgus) = tcx.collect_and_partition_mono_items(());
             info!("code generation units nums #{}", cgus.len());
-            let instances: Vec<Instance<'tcx>> = cgus
+            let _instances: Vec<Instance<'tcx>> = cgus
             .iter()
             .flat_map(|cgu| {
                 cgu.items().iter().filter_map(|(mono_item, _)| {

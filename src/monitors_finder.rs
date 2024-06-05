@@ -1,5 +1,5 @@
-use rustc_span::def_id::{DefId, CrateNum};
-use rustc_middle::{mir::Body, ty::TyCtxt};
+use rustc_span::def_id::DefId;
+use rustc_middle::ty::TyCtxt;
 use tracing::{debug, info};
 use crate::config;
 use macro_monitors_finder::generate_impl_monitors_finder_from_monitors_info;

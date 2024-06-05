@@ -3,7 +3,6 @@ use rustc_span::def_id::DefId;
 use rustc_span::DUMMY_SP;
 use rustc_span::source_map::Spanned;
 use rustc_span::Span;
-use rustc_middle::ty::GenericArgs;
 use rustc_middle::ty::Ty;
 use rustc_middle::ty::TyCtxt;
 use rustc_middle::ty::TyKind;
@@ -20,12 +19,8 @@ use rustc_middle::mir::Operand;
 use rustc_middle::mir::Place;
 use rustc_middle::mir::patch::MirPatch;
 use rustc_middle::mir::Rvalue;
-use rustc_middle::mir::Statement;
-use rustc_middle::mir::StatementKind;
-use rustc_middle::mir::SourceInfo;
 use rustc_middle::mir::Terminator;
 use rustc_middle::mir::TerminatorKind;
-use rustc_middle::mir::MutBorrowKind;
 
 use crate::utils;
 
@@ -54,11 +49,10 @@ fn build_drop_callsite_str_operand<'tcx>(
 }
 
 fn build_drop_span<'tcx>(
-    tcx: TyCtxt<'tcx>, 
+    _tcx: TyCtxt<'tcx>, 
     body: &Body<'tcx>, 
     drop_at_block: BasicBlock,
 ) -> Span {
-    // return body.span;
     let drop_at_block_data = &body.basic_blocks[drop_at_block];
     let drop_location = Location{
         block: drop_at_block,
@@ -82,9 +76,9 @@ pub trait ObjectDropInstrumenter {
         let drop_at_block_data = &body.basic_blocks[drop_at_block];
         let terminator = drop_at_block_data.terminator();
             match &terminator.kind {
-                TerminatorKind::Drop { place, target, unwind, replace} => {
+                TerminatorKind::Drop { place, target: _, unwind, replace: _} => {
                     let ty = place.ty(&body.local_decls, tcx).ty;
-                    let TyKind::Adt(adt_def, generic_args) = ty.kind() else {
+                    let TyKind::Adt(_adt_def, generic_args) = ty.kind() else {
                         unreachable!();
                     };
                     let mut patch = MirPatch::new(body);
@@ -118,13 +112,13 @@ pub trait ObjectDropInstrumenter {
                     });
                     Some((patch, new_bb_run_drop))
                 },
-                TerminatorKind::Call{ func, args, destination, target, unwind, call_source, fn_span} => {
+                TerminatorKind::Call{ func, args, destination: _, target: _, unwind, call_source: _, fn_span} => {
                     let Some(generic_args) = utils::get_function_generic_args(tcx, &body.local_decls, &func) else {
                         warn!("Found call to std/core::mem::drop but fail to get function generic_args");
                         unreachable!()
                     };
                     let arg_ty = generic_args.type_at(0);
-                    let TyKind::Adt(adt_def, generic_args) = arg_ty.kind() else {
+                    let TyKind::Adt(_adt_def, generic_args) = arg_ty.kind() else {
                         unreachable!()
                     };
                     let mut patch = MirPatch::new(body);
@@ -177,7 +171,7 @@ pub trait ObjectDropInstrumenter {
         match &terminator.kind {
             TerminatorKind::Drop { place, target, unwind, replace} => {
                 let ty = place.ty(&body.local_decls, tcx).ty;
-                let TyKind::Adt(adt_def, generic_args) = ty.kind() else {
+                let TyKind::Adt(_adt_def, generic_args) = ty.kind() else {
                     unreachable!();
                 };
                 let mut patch = MirPatch::new(body);
@@ -226,7 +220,7 @@ pub trait ObjectDropInstrumenter {
                     unreachable!()
                 };
                 let arg_ty = generic_args.type_at(0);
-                let TyKind::Adt(adt_def, generic_args) = arg_ty.kind() else {
+                let TyKind::Adt(_adt_def, generic_args) = arg_ty.kind() else {
                     unreachable!()
                 };
                 let mut patch = MirPatch::new(body);

@@ -1,24 +1,15 @@
-use std::collections::HashMap;
-
-use tracing::{trace, debug, info, warn, error};
+use tracing::{trace, debug, info, warn};
 use rustc_hir::BodyOwnerKind;
 use rustc_hir::definitions::DefPath;
 use rustc_hir::def::DefKind;
 use rustc_metadata::creader::CStore;
 use rustc_middle::mir::{*};
-use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt, TyKind};
-use rustc_middle::middle::exported_symbols::ExportedSymbol;
-use rustc_middle::mir::mono::MonoItem;
-use rustc_middle::mir::ConstOperand;
+use rustc_middle::ty::{TyCtxt, TyKind};
 use rustc_middle::mir::patch::MirPatch;
-use rustc_session::cstore::CrateDepKind;
-use rustc_span::{
-    def_id::{CrateNum, DefId, DefIndex, LocalDefId, LOCAL_CRATE},
-    DUMMY_SP,
-};
+use rustc_span::def_id::{CrateNum, DefId, DefIndex, LocalDefId, LOCAL_CRATE};
 
 pub(crate) use crate::utils;
-use crate::monitors_finder::{self, MonitorsFinder, MonitorsInfo};
+use crate::monitors_finder::{MonitorsFinder, MonitorsInfo};
 use crate::config;
 
 mod function_call_instrumenter;
@@ -66,7 +57,7 @@ pub fn find_all_monitors(tcx: TyCtxt<'_>) {
                 continue;
             }
             let crate_dep_kind = tcx.dep_kind(krate);
-            info!("traversaling crate {}", crate_name);
+            info!("traversaling crate {} ({crate_dep_kind:?})", crate_name);
             // Only public-facing way to traverse all the definitions in a non-local crate.
             // inspired by hacspec(https://github.com/rust-lang/rust/pull/85889)
             let crate_num_def_ids = crate_store.num_def_ids_untracked(krate);
@@ -279,7 +270,7 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
     for (bb, bb_data) in body.basic_blocks.iter_enumerated() {
         let terminator = bb_data.terminator();
         match &terminator.kind {
-            TerminatorKind::Drop { place, target, unwind, replace} => {
+            TerminatorKind::Drop { place, ..} => {
                 let ty = place.ty(&body.local_decls, tcx).ty;
                 if let TyKind::Adt(adt_def, generic_args) = ty.kind() {
                     let ty_def_id = adt_def.did();
@@ -296,7 +287,7 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
                     }
                 }
             }
-            TerminatorKind::Call{ func, args, destination, target, unwind, call_source, fn_span} => {
+            TerminatorKind::Call{ func, ..} => {
                 let Some(func_def_path_str) = utils::get_function_path_str(tcx, &body.local_decls, &func) else {
                     warn!("Found call to function but fail to get function DefPath");
                     continue;
@@ -330,7 +321,7 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
             _ => {}
         }
     }
-    for (bb, instrumenter, caller_def_path_str, generic_args) in instruement_pos.into_iter() {
+    for (bb, instrumenter, caller_def_path_str, _generic_args) in instruement_pos.into_iter() {
         let target_function = instrumenter.target_ty();
         let mut loc_bb = bb;
         info!("Instrumenting before handler for drop of type {} in {:?}", target_function, caller_def_path_str);

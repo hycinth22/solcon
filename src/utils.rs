@@ -1,10 +1,10 @@
 use std::env;
 use std::path::Path;
 use std::str::FromStr;
-use rustc_middle::ty::{self, GenericArgs, Instance, Ty, TyCtxt};
+use rustc_middle::ty::{self, GenericArgs, Ty, TyCtxt};
 use rustc_middle::mir::*;
 use rustc_span::DUMMY_SP;
-use rustc_span::def_id::{CrateNum, DefId};
+use rustc_span::def_id::DefId;
 use rustc_hir::definitions::DefPath;
 use tracing::{trace, info};
 use crate::config;
@@ -156,10 +156,10 @@ pub fn get_operand_ty<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &rustc_index::IndexV
 pub fn get_function_generic_args_from_ty<'tcx>(ty: &ty::Ty<'tcx>) -> Option<&'tcx GenericArgs<'tcx>> {
     let ty_kind: &rustc_type_ir::TyKind<TyCtxt> = ty.kind();
     match ty_kind {
-        ty::TyKind::FnDef(def_id, args) // // The anonymous type of a function declaration/definition
-        | ty::Closure(def_id, args) // // The anonymous type of a closure. Used to represent the type of |a| a.
-        | ty::TyKind::CoroutineClosure(def_id, args)  // The anonymous type of a closure. Used to represent the type of async |a| a.
-        | ty::TyKind::Coroutine(def_id, args) // The anonymous type of a coroutine. Used to represent the type of |a| yield a.
+        ty::TyKind::FnDef(_def_id, args) // // The anonymous type of a function declaration/definition
+        | ty::Closure(_def_id, args) // // The anonymous type of a closure. Used to represent the type of |a| a.
+        | ty::TyKind::CoroutineClosure(_def_id, args)  // The anonymous type of a closure. Used to represent the type of async |a| a.
+        | ty::TyKind::Coroutine(_def_id, args) // The anonymous type of a coroutine. Used to represent the type of |a| yield a.
         => {
             return Some(&args);
         }
@@ -356,15 +356,6 @@ pub fn alloc_unit_local<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::
 
 pub fn instantiate_our_func<'tcx>(tcx: TyCtxt<'tcx>, our_func_def_id: DefId, generic_args: &'tcx GenericArgs<'tcx>, fn_span: rustc_span::Span) -> Operand<'tcx> {
     let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
-    let func_ty = {
-         let binder = tcx.type_of(our_func_def_id);
-         let generics = tcx.generics_of(our_func_def_id);
-         if is_generic_func{
-             binder.instantiate(tcx, generic_args)
-         } else {
-             binder.instantiate_identity()
-         }
-    };
     if is_generic_func {
         Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
     } else {

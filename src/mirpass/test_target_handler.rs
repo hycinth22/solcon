@@ -1,18 +1,9 @@
 // this is a handler for test & templete purpose
 
-use std::collections::HashMap;
-
 use rustc_hir::def_id::DefId;
-use rustc_middle::mir::{self, BasicBlock, BasicBlockData, Body, BorrowKind, ConstOperand, Local, LocalDecl, MutBorrowKind, Operand, Place, ProjectionElem, Rvalue, SourceInfo, Statement, StatementKind, Terminator, TerminatorKind};
-use rustc_middle::mir::patch::MirPatch;
-use rustc_middle::mir::CallSource;
-use rustc_middle::ty::{self, Ty, TyCtxt};
-use rustc_span::{source_map::Spanned, DUMMY_SP};
 
 use crate::monitors_finder::MonitorsInfo;
-use super::utils::{alloc_unit_local, get_function_generic_args};
 use crate::mirpass::FunctionCallInstrumenter;
-use crate::utils;
 
 
 #[derive(Default)]
