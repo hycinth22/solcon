@@ -36,7 +36,6 @@ mod rwlock_readguard_drop_handler;
 mod rwlock_write_handler;
 mod rwlock_try_write_handler;
 mod rwlock_writeguard_drop_handler;
-mod inspect_func_call;
 
 pub trait OurMirPass {
     fn run_pass<'tcx>(&self, 
