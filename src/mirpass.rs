@@ -28,7 +28,14 @@ pub use obj_drop_instrumenter::ObjectDropInstrumenter;
 
 mod test_target_handler;
 mod mutex_lock_handler;
-mod mutexguard_drop;
+mod mutex_try_lock_handler;
+mod mutexguard_drop_handler;
+mod rwlock_read_handler;
+mod rwlock_try_read_handler;
+mod rwlock_readguard_drop_handler;
+mod rwlock_write_handler;
+mod rwlock_try_write_handler;
+mod rwlock_writeguard_drop_handler;
 mod inspect_func_call;
 
 pub trait OurMirPass {
@@ -142,9 +149,17 @@ pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
     inject_for_body(tcx, body, &monitors, &[
         &test_target_handler::TestTargetCallHandler::default(),
         &mutex_lock_handler::MutexLockCallHandler::default(), 
+        &mutex_try_lock_handler::MutexTryLockCallHandler::default(), 
+        &rwlock_read_handler::RwLockReadCallHandler::default(), 
+        &rwlock_write_handler::RwLockWriteCallHandler::default(), 
+        &rwlock_try_read_handler::RwLockTryReadCallHandler::default(), 
+        &rwlock_try_write_handler::RwLockTryWriteCallHandler::default(), 
     ],
     &[
-        &mutexguard_drop::MutexGuardDropInstrumenter::default(), 
+        &mutexguard_drop_handler::MutexGuardDropInstrumenter::default(),
+        &rwlock_readguard_drop_handler::RwLockReadGuardDropInstrumenter::default(),
+        &rwlock_writeguard_drop_handler::RwLockWriteGuardDropInstrumenter::default(),
+        
     ]
     , &[]);
 }

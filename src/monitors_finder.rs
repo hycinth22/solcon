@@ -17,10 +17,45 @@ pub(crate) struct MonitorsInfo {
     #[monitor_defpath = "this_is_our_mutex_lock_after_handle_function"]
     pub mutex_lock_after_fn: Option<DefId>,
 
+    #[monitor_defpath = "this_is_our_mutex_try_lock_before_handle_function"]
+    pub mutex_try_lock_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_mutex_try_lock_after_handle_function"]
+    pub mutex_try_lock_after_fn: Option<DefId>,
+
     #[monitor_defpath = "this_is_our_mutexguard_drop_before_handle_function"]
     pub mutexguard_drop_before_fn: Option<DefId>,
     #[monitor_defpath = "this_is_our_mutexguard_drop_after_handle_function"]
     pub mutexguard_drop_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_rwlock_read_before_handle_function"]
+    pub rwlock_read_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_rwlock_read_after_handle_function"]
+    pub rwlock_read_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_rwlock_write_before_handle_function"]
+    pub rwlock_write_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_rwlock_write_after_handle_function"]
+    pub rwlock_write_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_rwlock_try_read_before_handle_function"]
+    pub rwlock_try_read_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_rwlock_try_read_after_handle_function"]
+    pub rwlock_try_read_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_rwlock_try_write_before_handle_function"]
+    pub rwlock_try_write_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_rwlock_try_write_after_handle_function"]
+    pub rwlock_try_write_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_rwlock_readguard_drop_before_handle_function"]
+    pub rwlock_readguard_drop_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_rwlock_readguard_drop_after_handle_function"]
+    pub rwlock_readguard_drop_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_rwlock_writeguard_drop_before_handle_function"]
+    pub rwlock_writeguard_drop_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_rwlock_writeguard_drop_after_handle_function"]
+    pub rwlock_writeguard_drop_after_fn: Option<DefId>,
 }
 
 pub trait MonitorsFinder {
