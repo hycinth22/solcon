@@ -29,6 +29,10 @@ mod rwlock_try_write_handler;
 mod rwlock_writeguard_drop_handler;
 mod barrier_wait_handler;
 mod condvar_wait_handler;
+mod condvar_wait_timeout_handler;
+mod condvar_wait_timeout_ms_handler;
+mod condvar_wait_while_handler;
+mod condvar_wait_timeout_while_handler;
 
 pub trait OurMirPass {
     fn run_pass<'tcx>(&self, 
@@ -148,6 +152,10 @@ pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
         &rwlock_try_write_handler::RwLockTryWriteCallHandler::default(), 
         &barrier_wait_handler::BarrierWaitCallHandler::default(), 
         &condvar_wait_handler::CondvarWaitCallHandler::default(), 
+        &condvar_wait_timeout_handler::CondvarWaitTimeoutCallHandler::default(), 
+        &condvar_wait_timeout_ms_handler::CondvarWaitTimeoutMsCallHandler::default(), 
+        &condvar_wait_while_handler::CondvarWaitWhileCallHandler::default(), 
+        &condvar_wait_timeout_while_handler::CondvarWaitTimeoutWhileCallHandler::default(), 
     ],
     &[
         &mutexguard_drop_handler::MutexGuardDropInstrumenter::default(),

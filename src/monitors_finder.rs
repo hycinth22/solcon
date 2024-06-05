@@ -66,6 +66,26 @@ pub(crate) struct MonitorsInfo {
     pub condvar_wait_before_fn: Option<DefId>,
     #[monitor_defpath = "this_is_our_condvar_wait_after_handle_function"]
     pub condvar_wait_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_condvar_wait_timeout_before_handle_function"]
+    pub condvar_wait_timeout_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_condvar_wait_timeout_after_handle_function"]
+    pub condvar_wait_timeout_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_condvar_wait_timeout_ms_before_handle_function"]
+    pub condvar_wait_timeout_ms_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_condvar_wait_timeout_ms_after_handle_function"]
+    pub condvar_wait_timeout_ms_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_condvar_wait_while_before_handle_function"]
+    pub condvar_wait_while_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_condvar_wait_while_after_handle_function"]
+    pub condvar_wait_while_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_condvar_wait_timeout_while_before_handle_function"]
+    pub condvar_wait_timeout_while_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_condvar_wait_timeout_while_after_handle_function"]
+    pub condvar_wait_timeout_while_after_fn: Option<DefId>,
 }
 
 pub trait MonitorsFinder {
