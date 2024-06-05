@@ -319,7 +319,7 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
                             if ty_def_path_str == target_ty {
                                 let caller_def_id = body.source.def_id();
                                 let caller_def_path_str = tcx.def_path_str(caller_def_id);
-                                info!("Found drop of {} in {:?}  (should instrumented)", target_ty, func_def_path_str);
+                                info!("Found drop of {} in {:?}  (should instrumented)", target_ty, caller_def_path_str);
                                 instruement_pos.push((bb, instrumenter, caller_def_id, generic_args));
                             }
                         }
