@@ -27,6 +27,8 @@ mod rwlock_readguard_drop_handler;
 mod rwlock_write_handler;
 mod rwlock_try_write_handler;
 mod rwlock_writeguard_drop_handler;
+mod barrier_wait_handler;
+mod condvar_wait_handler;
 
 pub trait OurMirPass {
     fn run_pass<'tcx>(&self, 
@@ -144,6 +146,8 @@ pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
         &rwlock_write_handler::RwLockWriteCallHandler::default(), 
         &rwlock_try_read_handler::RwLockTryReadCallHandler::default(), 
         &rwlock_try_write_handler::RwLockTryWriteCallHandler::default(), 
+        &barrier_wait_handler::BarrierWaitCallHandler::default(), 
+        &condvar_wait_handler::CondvarWaitCallHandler::default(), 
     ],
     &[
         &mutexguard_drop_handler::MutexGuardDropInstrumenter::default(),

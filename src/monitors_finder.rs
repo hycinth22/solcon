@@ -56,6 +56,16 @@ pub(crate) struct MonitorsInfo {
     pub rwlock_writeguard_drop_before_fn: Option<DefId>,
     #[monitor_defpath = "this_is_our_rwlock_writeguard_drop_after_handle_function"]
     pub rwlock_writeguard_drop_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_barrier_wait_before_handle_function"]
+    pub barrier_wait_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_barrier_wait_after_handle_function"]
+    pub barrier_wait_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_condvar_wait_before_handle_function"]
+    pub condvar_wait_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_condvar_wait_after_handle_function"]
+    pub condvar_wait_after_fn: Option<DefId>,
 }
 
 pub trait MonitorsFinder {
