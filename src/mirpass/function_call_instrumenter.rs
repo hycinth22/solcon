@@ -61,8 +61,18 @@ pub(crate) fn build_monitor_args<'tcx>(patch: &mut MirPatch<'tcx>,
                     ));
                     Operand::Move(local_temp_ref_to_this_arg.into())
                 }
-                Operand::Constant(..) => {
-                    panic!("how to create ref to constat?")
+                Operand::Constant(box const_operand) => {
+                    // 生成一条语句将 const 的值赋给局部变量
+                    let const_local = patch.new_temp(const_operand.ty(), fn_span.clone());
+                    patch.add_assign(patch.terminator_loc(body, assign_ref_block), const_local.into(), Rvalue::Use(arg.node.clone()));
+                    let local_temp_ref_to_this_arg = patch.new_temp(Ty::new_imm_ref(tcx, tcx.lifetimes.re_erased, arg_ty), fn_span.clone());
+                    patch.add_assign(patch.terminator_loc(body, assign_ref_block), local_temp_ref_to_this_arg.into(), Rvalue::Ref(
+                       tcx.lifetimes.re_erased,
+                       BorrowKind::Shared,
+                       const_local.into(),
+                    ));
+                    Operand::Move(local_temp_ref_to_this_arg.into())
+                    // Operand::Move(const_local.into())
                 }
             }
         };
