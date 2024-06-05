@@ -13,7 +13,7 @@ use rustc_middle::mir::ConstOperand;
 use rustc_middle::mir::patch::MirPatch;
 use rustc_session::cstore::CrateDepKind;
 use rustc_span::{
-    def_id::{CrateNum, DefId, DefIndex, LOCAL_CRATE},
+    def_id::{CrateNum, DefId, DefIndex, LocalDefId, LOCAL_CRATE},
     DUMMY_SP,
 };
 
@@ -38,8 +38,11 @@ pub trait OurMirPass {
     -> Option< MirPatch<'tcx> >;
 }
 
-pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
-    info!("our pass is running");
+pub(crate) static START_INSTRUMENT : std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub(crate) static MONITORS : std::sync::OnceLock<MonitorsInfo> = std::sync::OnceLock::new();
+
+// call only once
+pub fn find_all_monitors(tcx: TyCtxt<'_>) {
     info!("prescaning");
     let mut monitors = MonitorsInfo::default();
     let crates = tcx.crates(());
@@ -76,60 +79,74 @@ pub fn run_our_pass<'tcx>(tcx: TyCtxt<'tcx>) {
         }
     }
     info!("{monitors:#?}");
-    let all_function_local_def_ids = tcx.mir_keys(()); // all the body owners, but also things like struct constructors.
-    for local_def_id in all_function_local_def_ids {
-        let def_id = local_def_id.to_def_id();
-        let def_path = tcx.def_path(def_id);
-        let def_path_str = tcx.def_path_str(def_id);
-        let body_owner_kind = tcx.hir().body_owner_kind(*local_def_id);
-        match body_owner_kind {
-            BodyOwnerKind::Const{..} | BodyOwnerKind::Static(..) => {
-                warn!("skip body kind {:?}", body_owner_kind);
-                continue;
-            }
-            BodyOwnerKind::Fn | BodyOwnerKind::Closure => {}
-        }
+    MONITORS.set(monitors).unwrap()
+}
 
-        // since the compiler doesnt provide mutable interface, using unsafe to get one from optimized_mir
+/// The original query is "Optimize the MIR and prepare it for codegen."
+/// here We instrument mir::Body
+pub(crate) fn our_optimized_mir(tcx: TyCtxt<'_>, did: LocalDefId) -> &Body<'_> {
+    let mut providers = rustc_middle::util::Providers::default();
+    rustc_mir_transform::provide(&mut providers);
+    let original_optimized_mir = providers.optimized_mir;
+    let body= original_optimized_mir(tcx, did);
+    if START_INSTRUMENT.load(std::sync::atomic::Ordering::Acquire) {
+        // we should be the only reference holder in the window from the end of the original query until the return, according to the current implementation of optimized_mir .
         #[allow(invalid_reference_casting)]
-        let body: &mut _ =  unsafe{
-            let immutable_ref = tcx.optimized_mir(def_id);
+        let body_mut: &mut _ =  unsafe{
+            let immutable_ref= body;
             let mutable_ptr = immutable_ref as *const Body as *mut Body;
             &mut *mutable_ptr
         };
-        // let def_id = body.source.def_id();
-        trace!("found body instance of {}", def_path_str);
-
-        if tcx.is_foreign_item(def_id) {
-            // 跳过外部函数(例如 extern "C")
-            debug!("skip body instance of {} because is_foreign_item", def_path_str);
-            continue;
-        }
-        // Skip promoted src
-        if body.source.promoted.is_some() {
-            debug!("skip body instance of {} because promoted.is_some", def_path_str);
-            continue;
-        }
-        if is_filtered_def_path(tcx, &def_path) {
-            debug!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
-            continue;
-        }
-        // dont know why enable here leads to undefined symbol. unfinished
-        // if !tcx.is_codegened_item(def_id) {
-        //     warn!("skip body instance of {:?} because not is_codegened_item", def_path_str);
-        //     continue;
-        // }
-        debug!("try inject for bb of function body of {}", def_path_str);
-        inject_for_body(tcx, body, &monitors, &[
-            &test_target_handler::TestTargetCallHandler::default(),
-            &mutex_lock_handler::MutexLockCallHandler::default(), 
-            // &inspect_func_call::FunctionCallInspectorPass::default(),
-        ],
-        &[
-            &mutexguard_drop::MutexGuardDropInstrumenter::default(), 
-        ]
-        , &[]);
+        let monitors = MONITORS.get().unwrap();
+        run_our_pass_on_body(tcx, &monitors, did, body_mut);
     }
+    body
+}
+
+pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
+  local_def_id:LocalDefId, body: &mut Body<'tcx>
+) {
+    let def_id = local_def_id.to_def_id();
+    let def_path = tcx.def_path(def_id);
+    let def_path_str = tcx.def_path_str(def_id);
+    let body_owner_kind = tcx.hir().body_owner_kind(local_def_id);
+    match body_owner_kind {
+        BodyOwnerKind::Const{..} | BodyOwnerKind::Static(..) => {
+            warn!("skip body kind {:?}", body_owner_kind);
+            return;
+        }
+        BodyOwnerKind::Fn | BodyOwnerKind::Closure => {}
+    }
+    trace!("found body instance of {}", def_path_str);
+
+    if tcx.is_foreign_item(def_id) {
+        // 跳过外部函数(例如 extern "C")
+        debug!("skip body instance of {} because is_foreign_item", def_path_str);
+        return;
+    }
+    // Skip promoted src
+    if body.source.promoted.is_some() {
+        debug!("skip body instance of {} because promoted.is_some", def_path_str);
+        return;
+    }
+    if is_filtered_def_path(tcx, &def_path) {
+        debug!("skip body instance of {:?} because utils::is_filtered_def_path", def_path_str);
+        return;
+    }
+    // dont know why enable here leads to undefined symbol. unfinished
+    // if !tcx.is_codegened_item(def_id) {
+    //     warn!("skip body instance of {:?} because not is_codegened_item", def_path_str);
+    //     continue;
+    // }
+    debug!("try inject for bb of function body of {}", def_path_str);
+    inject_for_body(tcx, body, &monitors, &[
+        &test_target_handler::TestTargetCallHandler::default(),
+        &mutex_lock_handler::MutexLockCallHandler::default(), 
+    ],
+    &[
+        &mutexguard_drop::MutexGuardDropInstrumenter::default(), 
+    ]
+    , &[]);
 }
 
 fn is_filtered_def_path(tcx: TyCtxt<'_>, def_path: &DefPath) -> bool {

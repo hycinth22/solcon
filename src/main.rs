@@ -20,15 +20,18 @@ extern crate rustc_log;
 extern crate rustc_type_ir;
 extern crate rustc_metadata;
 extern crate rustc_middle;
+extern crate rustc_mir_transform;
 extern crate rustc_session;
 extern crate rustc_span;
 
 use tracing::{info, trace, debug};
 use rustc_driver::Compilation;
+use rustc_session::Session;
 use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
 use rustc_middle::ty::Instance;
 use rustc_middle::mir::mono::MonoItem;
+use rustc_middle::util::Providers;
 use std::env;
 use std::io::{self, IsTerminal};
 use std::path::PathBuf;
@@ -40,6 +43,9 @@ mod mirpass;
 pub(crate) mod monitors_finder;
 mod utils;
 
+fn override_queries(_session: &Session, local: &mut Providers) {
+    local.queries.optimized_mir = mirpass::our_optimized_mir;
+}
 
 // inspired by lockbud & miri
 fn main() {
@@ -243,6 +249,21 @@ impl rustc_driver::Callbacks for Callbacks {
             }
             Some(path_buf) => self.output_directory.push(path_buf.as_path()),
         }
+        // override_queries inspired by miri & rustc compiler team
+        config.override_queries = Some(override_queries);
+    }
+
+    fn after_expansion<'tcx>(
+        &mut self,
+        _compiler: &rustc_interface::interface::Compiler,
+        queries: &'tcx rustc_interface::Queries<'tcx>,
+    ) -> rustc_driver::Compilation {
+        let mut global_ctxt = queries.global_ctxt().unwrap();
+        global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
+            mirpass::find_all_monitors(tcx);
+            tcx.dcx().abort_if_errors();
+        });
+        Compilation::Continue
     }
     
     fn after_analysis<'tcx>(
@@ -323,7 +344,11 @@ impl rustc_driver::Callbacks for Callbacks {
             }
 
             // Transform
-            mirpass::run_our_pass(tcx);
+            info!("our pass is running");
+            if mirpass::MONITORS.get().is_none() {
+                panic!("mirpass::MONITORS.get().is_none(), this should be set when call mirpass::find_all_monitors");
+            }
+            mirpass::START_INSTRUMENT.store(true, std::sync::atomic::Ordering::Release);
             dcx.abort_if_errors();
 
             // Post-check
