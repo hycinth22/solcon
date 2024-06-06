@@ -33,6 +33,7 @@ mod condvar_wait_timeout_handler;
 mod condvar_wait_timeout_ms_handler;
 mod condvar_wait_while_handler;
 mod condvar_wait_timeout_while_handler;
+mod entry_fn_handler;
 
 pub trait OurMirPass {
     fn run_pass<'tcx>(&self, 
@@ -117,7 +118,8 @@ pub(crate) fn our_optimized_mir(tcx: TyCtxt<'_>, did: LocalDefId) -> &Body<'_> {
         if let Some(entry_fn_def_id) = ENTRY_FN_DEF_ID.get() {
             let entry_fn_local_def_id = entry_fn_def_id.expect_local();
             if entry_fn_local_def_id == did {
-                // TODO: process entry fn here
+                let entry_fn_handler = entry_fn_handler::EntryFnBodyInstrumenter::default();
+                entry_fn_handler.instrument_body(tcx, body_mut, monitors);
             }
         }
         run_our_pass_on_body(tcx, &monitors, did, body_mut);
