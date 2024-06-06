@@ -261,6 +261,7 @@ impl rustc_driver::Callbacks for Callbacks {
     ) -> rustc_driver::Compilation {
         let mut global_ctxt = queries.global_ctxt().unwrap();
         global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
+            mirpass::find_entry_fn(tcx);
             mirpass::find_all_monitors(tcx);
             tcx.dcx().abort_if_errors();
         });

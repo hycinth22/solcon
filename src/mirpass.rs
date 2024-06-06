@@ -43,6 +43,7 @@ pub trait OurMirPass {
 
 pub(crate) static START_INSTRUMENT : std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 pub(crate) static MONITORS : std::sync::OnceLock<MonitorsInfo> = std::sync::OnceLock::new();
+pub(crate) static ENTRY_FN_DEF_ID : std::sync::OnceLock<DefId> = std::sync::OnceLock::new();
 
 // call only once
 pub fn find_all_monitors(tcx: TyCtxt<'_>) {
@@ -85,25 +86,53 @@ pub fn find_all_monitors(tcx: TyCtxt<'_>) {
     MONITORS.set(monitors).unwrap()
 }
 
+fn original_optimized_mir(tcx: TyCtxt<'_>, did: LocalDefId) -> &Body<'_> {
+    let original_providers : _ = {
+        let mut provider = rustc_middle::util::Providers::default();
+        rustc_mir_transform::provide(&mut provider);
+        provider
+    };
+    let original_optimized_mir = original_providers.optimized_mir;
+    original_optimized_mir(tcx, did)
+}
+
+unsafe fn get_mut_ref_body<'bodyref, 'tcx>(body: &Body<'tcx>) -> &'bodyref mut Body<'tcx> {
+    #[allow(invalid_reference_casting)]
+    let body_mut: &mut _ =  unsafe{
+        let immutable_ref= body;
+        let mutable_ptr = immutable_ref as *const Body as *mut Body;
+        &mut *mutable_ptr
+    };
+    body_mut
+}
+
 /// The original query is "Optimize the MIR and prepare it for codegen."
 /// here We instrument mir::Body
 pub(crate) fn our_optimized_mir(tcx: TyCtxt<'_>, did: LocalDefId) -> &Body<'_> {
-    let mut providers = rustc_middle::util::Providers::default();
-    rustc_mir_transform::provide(&mut providers);
-    let original_optimized_mir = providers.optimized_mir;
     let body= original_optimized_mir(tcx, did);
     if START_INSTRUMENT.load(std::sync::atomic::Ordering::Acquire) {
         // we should be the only reference holder in the window from the end of the original query until the return, according to the current implementation of optimized_mir .
-        #[allow(invalid_reference_casting)]
-        let body_mut: &mut _ =  unsafe{
-            let immutable_ref= body;
-            let mutable_ptr = immutable_ref as *const Body as *mut Body;
-            &mut *mutable_ptr
-        };
+        let body_mut = unsafe {get_mut_ref_body(body)};
         let monitors = MONITORS.get().unwrap();
+        if let Some(entry_fn_def_id) = ENTRY_FN_DEF_ID.get() {
+            let entry_fn_local_def_id = entry_fn_def_id.expect_local();
+            if entry_fn_local_def_id == did {
+                // TODO: process entry fn here
+            }
+        }
         run_our_pass_on_body(tcx, &monitors, did, body_mut);
     }
     body
+}
+
+pub fn find_entry_fn(tcx: TyCtxt<'_>) {
+    let Some((entry_fn, entry_fn_type)) = tcx.entry_fn(()) else {
+        info!("skip instruement_entry_fn because tcx.entry_fn(()) is None");
+        return;
+    };
+    let entry_fn_def_path_str = tcx.def_path_str(entry_fn);
+    info!("found entry_fn {entry_fn_def_path_str}, type {entry_fn_type:?}");
+    ENTRY_FN_DEF_ID.set(entry_fn).unwrap();
 }
 
 pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
