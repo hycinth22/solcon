@@ -113,7 +113,7 @@ fn main() {
     }
     // note filepath must start with lib & end with .rlib(e.g lib*.rlib)
     // see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_metadata/src/locator.rs#L731
-    let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath)) = utils::find_our_monitor_lib() else {
+    let Some((solcon_monitor_function_rlib_filepath, solcon_monitor_function_rlib_dirpath, solcon_monitor_function_deps_dirpath)) = utils::find_our_monitor_lib() else {
        early_dcx.early_fatal("solcon monitor function rlib not exist")
     };
     let solcon_monitors_lib_crate_name = config::MONITORS_LIB_CRATE_NAME;
@@ -125,7 +125,8 @@ fn main() {
     // because our monitor lib is dependency of each crate, so downstream crate also transmitively dependent on ur monitor lib and search on directories of -L
     rustc_command_line_arguments.push("-L".to_owned());
     rustc_command_line_arguments.push(format!("dependency={solcon_monitor_function_rlib_dirpath}"));
-
+    rustc_command_line_arguments.push("-L".to_owned());
+    rustc_command_line_arguments.push(format!("dependency={solcon_monitor_function_deps_dirpath}"));
    
     let always_encode_mir: String = "always-encode-mir".into();
     if !rustc_command_line_arguments

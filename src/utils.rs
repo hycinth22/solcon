@@ -65,21 +65,19 @@ pub fn find_sysroot() -> Option<String> {
     None
 }
 
-fn get_parent_path(path: &str) -> Option<String> {
-    let parent_path = Path::new(path).parent()?.to_str()?;
-    Some(parent_path.into())
-}
-
-pub fn find_our_monitor_lib() -> Option<(String, String)>  {
+pub fn find_our_monitor_lib() -> Option<(String, String, String)>  {
     if let Ok(lib_path) = env::var("SOLCON_MONITOR_LIB_PATH") {
         info!("find env SOLCON_MONITOR_LIB_PATH: {}", lib_path);
-        let dir_path = get_parent_path(lib_path.as_str())?;
-        return Some((lib_path, dir_path));
+        let dir_path = Path::new(&lib_path).parent()?;
+        let lib_deps_path: String = dir_path.join("deps").to_str()?.to_owned();
+        return Some((lib_path.to_owned(), dir_path.to_str()?.to_owned(), lib_deps_path));
     }
     let current_dir = env::current_dir().ok()?;
     let lib_file_path = current_dir.join(config::MONITORS_LIB_DEFAULT_FILEPATH);
     if lib_file_path.exists() {
-        return Some((String::from(lib_file_path.to_str()?), get_parent_path(lib_file_path.to_str()?)?));
+        let dir_path = Path::new(&lib_file_path).parent()?;
+        let lib_deps_path: String = dir_path.join("deps").to_str()?.to_owned();
+        return Some((String::from(lib_file_path.to_str()?), dir_path.to_str()?.to_owned(), lib_deps_path));
     }
     info!("fail to find our monitor lib {}", String::from(lib_file_path.to_str()?));
     None
