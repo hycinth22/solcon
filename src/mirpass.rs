@@ -17,7 +17,11 @@ pub use function_call_instrumenter::FunctionCallInstrumenter;
 mod obj_drop_instrumenter;
 pub use obj_drop_instrumenter::ObjectDropInstrumenter;
 
-mod test_target_handler;
+#[cfg(feature = "enable_debug_passes")]
+mod debug_use_test_target_handler;
+#[cfg(feature = "enable_debug_passes")]
+mod debug_use_inspect_func_call;
+
 mod mutex_lock_handler;
 mod mutex_try_lock_handler;
 mod mutexguard_drop_handler;
@@ -174,7 +178,11 @@ pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
     // }
     debug!("try inject for bb of function body of {}", def_path_str);
     inject_for_body(tcx, body, &monitors, &[
-        &test_target_handler::TestTargetCallHandler::default(),
+        #[cfg(feature = "enable_debug_passes")]
+        &debug_use_test_target_handler::TestTargetCallHandler::default(),
+        #[cfg(feature = "enable_debug_passes")]
+        &debug_use_inspect_func_call::FunctionCallInspectorInstrumenter::default(),
+
         &mutex_lock_handler::MutexLockCallHandler::default(), 
         &mutex_try_lock_handler::MutexTryLockCallHandler::default(), 
         &rwlock_read_handler::RwLockReadCallHandler::default(), 

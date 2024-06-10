@@ -35,3 +35,4 @@ rustc_private = true
 
 [features]
 input_filter = []
+enable_debug_passes = []
