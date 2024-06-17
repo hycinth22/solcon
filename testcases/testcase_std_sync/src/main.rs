@@ -74,12 +74,12 @@ fn testconvar() {
     println!("test Condvar wait_while");
     *guard = false;
     spwan_notify_thread(Arc::clone(&cm_pair));
-    let mut guard = condvar.wait_while(guard, |val| *val).unwrap();
+    let mut guard = condvar.wait_while(guard, |val| !*val).unwrap();
 
     println!("test Condvar wait_timeout_while");
     *guard = false;
     spwan_notify_thread(Arc::clone(&cm_pair));
-    let guard = condvar.wait_timeout_while(guard, Duration::MAX, |val| *val).unwrap();
+    let guard = condvar.wait_timeout_while(guard, Duration::MAX, |val| !*val).unwrap();
 }
 
 fn test_multimutex() {
