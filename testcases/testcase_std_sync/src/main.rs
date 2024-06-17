@@ -47,6 +47,8 @@ fn main() {
     barrier.wait();
 
     testconvar();
+
+    test_multimutex();
 }
 
 fn testconvar() {
@@ -78,4 +80,13 @@ fn testconvar() {
     *guard = false;
     spwan_notify_thread(Arc::clone(&cm_pair));
     let guard = condvar.wait_timeout_while(guard, Duration::MAX, |val| *val).unwrap();
+}
+
+fn test_multimutex() {
+    let a = Mutex::new(1);
+    let b = Mutex::new(2);
+    let c = Mutex::new(3);
+    let g1 = a.lock();
+    let g2 = b.lock();
+    let g3 = c.lock();
 }
