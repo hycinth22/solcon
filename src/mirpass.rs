@@ -176,7 +176,7 @@ pub fn run_our_pass_on_body<'tcx>(tcx: TyCtxt<'tcx>, monitors: &MonitorsInfo,
     //     warn!("skip body instance of {:?} because not is_codegened_item", def_path_str);
     //     continue;
     // }
-    debug!("try inject for bb of function body of {}", def_path_str);
+    info!("--------- running pass on function body of {}", def_path_str);
     inject_for_body(tcx, body, &monitors, &[
         #[cfg(feature = "enable_debug_passes")]
         &debug_use_test_target_handler::TestTargetCallHandler::default(),
