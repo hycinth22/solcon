@@ -368,6 +368,9 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
                         warn!("found call to drop function {func_def_path_str} but type is not adt");
                     }
                 }
+                if func_def_path_str == "std::ptr::drop_in_place" || func_def_path_str == "core::ptr::drop_in_place" {
+                        unimplemented!("unimplement process for drop_in_place");
+                }
             }
             _ => {}
         }
