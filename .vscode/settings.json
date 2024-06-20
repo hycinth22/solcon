@@ -1,5 +1,4 @@
 {
     "commentTranslate.hover.enabled": false,
-    // "rust-analyzer.rustcSource": "E:\\Src\\rust240515\\compiler\\rustc_driver\\Cargo.toml"
-    "rust-analyzer.rustcSource": "/media/hycinth/newE/Src/rust240515/compiler/rustc_driver/Cargo.toml"
+    "rust-analyzer.rustcSource": "../rust/compiler/rustc_driver/Cargo.toml"
 }
