@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use std::sync::MutexGuard;
 use std::sync::RwLock;
 use std::sync::Barrier;
 use std::sync::Condvar;
@@ -87,56 +88,79 @@ fn test_multimutex() {
     let b = Mutex::new(2);
     let c = Mutex::new(3);
     let d = RwLock::new(4);
-    let g1 = a.lock().unwrap();
-    let g2 = b.lock().unwrap();
-    let g3 = c.lock().unwrap();
-    let g4 = d.read().unwrap();
-    drop(g4);
-    drop(g3);
-    drop(g2);
-    drop(g1);
-    let g5 = d.write().unwrap();
-    drop(g5);
-    let g6 = d.read().unwrap();
-    let g7 = d.read().unwrap();
-    drop(g6);
-    drop(g7);
-    let g1 = a.lock().unwrap();
-    let g2 = b.lock().unwrap();
-    let g3 = c.lock().unwrap();
-    let g4 = d.read().unwrap();
-    drop(g4);
-    let g5 = d.write().unwrap();
-    drop(g5);
-    let t = Mutex::new(5);
-    thread::spawn(move || {
-        let g1 = t.lock().unwrap();
-        let g1 = t.lock().unwrap();
-        unreachable!("should deadlock before here");
-    });
-    let t = Arc::new(RwLock::new(6));
-    let t_2 = Arc::clone(&t);
-    let barrier1_1 = Arc::new(Barrier::new(2));
-    let barrier1_2 = Arc::clone(&barrier1_1);
-    let barrier2_1 = Arc::new(Barrier::new(2));
-    let barrier2_2 = Arc::new(Barrier::new(2));
-    thread::spawn(move || {
-        let g1 = t.write().unwrap();
-        barrier1_1.wait();
-        barrier2_1.wait();
-    });
-    thread::spawn(move || {
-        let g1 = t_2.read().unwrap();
-        barrier1_2.wait();
-        let g1 = t_2.read().unwrap();
-        barrier2_2.wait();
-        unreachable!("should deadlock before here");
-    });
-
-    let t = RwLock::new(7);
-    thread::spawn(move || {
-        let g1 = t.write().unwrap();
-        let g1 = t.write().unwrap();
-        unreachable!("should deadlock before here");
-    });
+    {
+        let g1 = a.lock().unwrap();
+        let g2 = b.lock().unwrap();
+        let g3 = c.lock().unwrap();
+        let g4 = d.read().unwrap();
+        drop(g4);
+        drop(g3);
+        drop(g2);
+        drop(g1);
+    }
+    {
+        let g5 = d.write().unwrap();
+        drop(g5);
+    }
+    {
+        let g6 = d.read().unwrap();
+        let g7 = d.read().unwrap();
+        drop(g6);
+        drop(g7);
+    }
+    {
+        let g1 = a.lock().unwrap();
+        let g2 = b.lock().unwrap();
+        let g3 = c.lock().unwrap();
+        let g4 = d.read().unwrap();
+        drop(g4);
+        let g5 = d.write().unwrap();
+        drop(g5);
+    }
+    {
+        let t = Mutex::new(5);
+        thread::spawn(move || {
+            let g1 = t.lock().unwrap();
+            let g1 = t.lock().unwrap();
+            unreachable!("should deadlock before here");
+        });
+    }
+    {
+        let t = Arc::new(RwLock::new(6));
+        let t_2 = Arc::clone(&t);
+        let barrier1_1 = Arc::new(Barrier::new(2));
+        let barrier1_2 = Arc::clone(&barrier1_1);
+        let barrier2_1 = Arc::new(Barrier::new(2));
+        let barrier2_2 = Arc::new(Barrier::new(2));
+        thread::spawn(move || {
+            let g1 = t.write().unwrap();
+            barrier1_1.wait();
+            barrier2_1.wait();
+        });
+        thread::spawn(move || {
+            let g1 = t_2.read().unwrap();
+            barrier1_2.wait();
+            let g1 = t_2.read().unwrap();
+            barrier2_2.wait();
+            unreachable!("should deadlock before here");
+        });
+    }
+    {
+        let t = RwLock::new(7);
+        thread::spawn(move || {
+            let g1 = t.write().unwrap();
+            let g1 = t.write().unwrap();
+            unreachable!("should deadlock before here");
+        });
+    }
+    {
+        let g1 = a.lock().unwrap();
+        let g2 = b.lock().unwrap();
+        let g3 = c.lock().unwrap();
+        let g4 = d.read().unwrap();
+        test_moveguard(g2);
+        drop(g1);
+    }
 }
+
+fn test_moveguard<T>(guard: MutexGuard<T>) {}
