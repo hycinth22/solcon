@@ -50,6 +50,7 @@ fn main() {
     testconvar();
 
     test_multimutex();
+    test_conflict_lock();
 }
 
 fn testconvar() {
@@ -154,6 +155,7 @@ fn test_multimutex() {
         });
     }
     {
+        // test drop in random order
         let g1 = a.lock().unwrap();
         let g2 = b.lock().unwrap();
         let g3 = c.lock().unwrap();
@@ -164,3 +166,78 @@ fn test_multimutex() {
 }
 
 fn test_moveguard<T>(guard: MutexGuard<T>) {}
+
+fn test_conflict_lock() {
+    {
+        println!("test confilct lock");
+        let m1_arc = Arc::new(Mutex::new(7));
+        let m1_arc2 = Arc::clone(&m1_arc);
+        let m2_arc = Arc::new(Mutex::new(8));
+        let m2_arc2 = Arc::clone(&m2_arc);
+        let barrier_arc1 = Arc::new(Barrier::new(2));
+        let barrier_arc2 = Arc::clone(&barrier_arc1);
+        let barrier_arc3 = Arc::clone(&barrier_arc1);
+        // test conlict lock order
+        thread::spawn(move || {
+            let g1 = m1_arc.lock().unwrap();
+            barrier_arc1.wait();
+            let g2 = m2_arc.lock().unwrap();
+            unreachable!("should deadlock before here");
+        });
+        thread::spawn(move || {
+            let g2 = m2_arc2.lock().unwrap();
+            barrier_arc2.wait();
+            let g1 = m1_arc2.lock().unwrap();
+            unreachable!("should deadlock before here");
+        });
+        thread::sleep(Duration::from_millis(1000));
+    }
+    {
+        println!("test confilct lock");
+        let m1_arc = Arc::new(RwLock::new(7));
+        let m1_arc2 = Arc::clone(&m1_arc);
+        let m2_arc = Arc::new(RwLock::new(8));
+        let m2_arc2 = Arc::clone(&m2_arc);
+        let barrier_arc1 = Arc::new(Barrier::new(2));
+        let barrier_arc2 = Arc::clone(&barrier_arc1);
+        let barrier_arc3 = Arc::clone(&barrier_arc1);
+        // test conlict lock order
+        thread::spawn(move || {
+            let g1 = m1_arc.write().unwrap();
+            barrier_arc1.wait();
+            let g2 = m2_arc.write().unwrap();
+            unreachable!("should deadlock before here");
+        });
+        thread::spawn(move || {
+            let g2 = m2_arc2.write().unwrap();
+            barrier_arc2.wait();
+            let g1 = m1_arc2.write().unwrap();
+            unreachable!("should deadlock before here");
+        });
+        thread::sleep(Duration::from_millis(1000));
+    }
+    {
+        println!("test confilct lock");
+        let m1_arc = Arc::new(Mutex::new(7));
+        let m1_arc2 = Arc::clone(&m1_arc);
+        let m2_arc = Arc::new(RwLock::new(8));
+        let m2_arc2 = Arc::clone(&m2_arc);
+        let barrier_arc1 = Arc::new(Barrier::new(2));
+        let barrier_arc2 = Arc::clone(&barrier_arc1);
+        let barrier_arc3 = Arc::clone(&barrier_arc1);
+        // test conlict lock order
+        thread::spawn(move || {
+            let g1 = m1_arc.lock().unwrap();
+            barrier_arc1.wait();
+            let g2 = m2_arc.write().unwrap();
+            unreachable!("should deadlock before here");
+        });
+        thread::spawn(move || {
+            let g2 = m2_arc2.write().unwrap();
+            barrier_arc2.wait();
+            let g1 = m1_arc2.lock().unwrap();
+            unreachable!("should deadlock before here");
+        });
+        thread::sleep(Duration::from_millis(1000));
+    }
+}
