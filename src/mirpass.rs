@@ -114,7 +114,7 @@ unsafe fn get_mut_ref_body<'bodyref, 'tcx>(body: &Body<'tcx>) -> &'bodyref mut B
 /// The original query is "Optimize the MIR and prepare it for codegen."
 /// here We instrument mir::Body
 pub(crate) fn our_optimized_mir(tcx: TyCtxt<'_>, did: LocalDefId) -> &Body<'_> {
-    let body= original_optimized_mir(tcx, did);
+    let body = original_optimized_mir(tcx, did);
     if START_INSTRUMENT.load(std::sync::atomic::Ordering::Acquire) {
         // we should be the only reference holder in the window from the end of the original query until the return, according to the current implementation of optimized_mir .
         let body_mut = unsafe {get_mut_ref_body(body)};
@@ -369,7 +369,7 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
                     }
                 }
                 if func_def_path_str == "std::ptr::drop_in_place" || func_def_path_str == "core::ptr::drop_in_place" {
-                        unimplemented!("unimplement process for drop_in_place");
+                        unimplemented!("unimplement process for ptr::drop_in_place");
                 }
             }
             _ => {}
