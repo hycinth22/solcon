@@ -65,7 +65,7 @@ pub fn find_all_monitors(tcx: TyCtxt<'_>) {
         if krate != LOCAL_CRATE {
             let crate_name = tcx.crate_name(krate);
             if crate_name.as_str() != config::MONITORS_LIB_CRATE_NAME {
-                debug!("skip mismatch crate name {crate_name}");
+                trace!("skip mismatch crate name {crate_name}");
                 continue;
             }
             let crate_dep_kind = tcx.dep_kind(krate);
@@ -80,7 +80,7 @@ pub fn find_all_monitors(tcx: TyCtxt<'_>) {
             for def_id in def_ids {
                 let def_path_str = tcx.def_path_str(def_id);
                 let def_kind = tcx.def_kind(def_id);
-                info!("found external {def_kind:?} : {}", def_path_str);
+                trace!("found external {def_kind:?} : {}", def_path_str);
                 if matches!(def_kind, DefKind::Fn) {
                     monitors.try_match_with_our_function(tcx, &def_id);
                 }
@@ -252,7 +252,7 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
         debug!("filtered crate_name {crate_name_str}");
         return true;
     } else {
-        debug!("unfiltered crate_name {crate_name_str}");
+        trace!("unfiltered crate_name {crate_name_str}");
     }
     false
 }

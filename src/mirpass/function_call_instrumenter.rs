@@ -40,7 +40,7 @@ pub(crate) fn build_monitor_args<'tcx>(patch: &mut MirPatch<'tcx>,
         // 所以，我们在这里我们仅保持指针类型(reference, raw pointer, fn pointer) 按Copy传递，
         // 将所有其他参数更改为reference传递。
         let operand = if call_arg_ty.is_any_ptr() {
-            debug!("call_arg_ty.is_any_ptr()");
+            // debug!("call_arg_ty.is_any_ptr()");
             match arg.node {
                 // 对于reference类型，虽然仅&T实现了Copy trait而&mut T没有Copy trait（https://doc.rust-lang.org/stable/src/core/marker.rs.html#437），
                 // 但是我们在这里仍可以安全地复制&mut T。理由是，Copy trait的意义在于保证可以按位复制不需要deconstructor（drop），而我们的pass运行在optimized_mir（MIR to Binaries阶段）已经运行过analysis阶段，所以可以对任意类型（无论是否实现Copy trait）进行bitwise Copy而不会影响drop elaboration
@@ -48,7 +48,7 @@ pub(crate) fn build_monitor_args<'tcx>(patch: &mut MirPatch<'tcx>,
                 Operand::Copy(..) | Operand::Constant(..) => arg.node.clone(),
             }
         } else {
-            debug!("!call_arg_ty.is_any_ptr()");
+            // debug!("!call_arg_ty.is_any_ptr()");
             // 理论上只要没有Drop trait（特别是实现了Copy trait），我们仍然可以按照Copy直接传递对象，但是这样 1. 可能有效率问题 2. 带来接口的不统一（需要人工查看每个类型是否有Drop trait）
             // 所以，在这里，我们简单地统一对于将所有非指针类型(非reference, raw pointer, fn pointer)参数转换为reference传递
             match arg.node {

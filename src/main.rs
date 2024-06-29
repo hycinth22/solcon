@@ -147,6 +147,7 @@ fn main() {
         rustc_command_line_arguments.push("mir-opt-level=1".into());
     }
 
+/*
     if !rustc_command_line_arguments
         .iter()
         .any(|arg| arg.starts_with(&"print_mono_items"))
@@ -155,6 +156,7 @@ fn main() {
         rustc_command_line_arguments.push("-Z".into());
         rustc_command_line_arguments.push("print_mono_items=lazy".into()); // lazy or eager if needed, see https://github.com/rust-lang/rust/blob/a71c3ffce9ca505af27f43cd3bad7606a72e3ec8/compiler/rustc_monomorphize/src/collector.rs#L1482
     }
+*/
 
     if !rustc_command_line_arguments
         .iter()

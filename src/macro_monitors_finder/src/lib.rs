@@ -55,7 +55,7 @@ pub fn generate_impl_monitors_finder_from_monitors_info(_attr: TokenStream, item
             fn try_match_with_our_function(&mut self, tcx: TyCtxt<'_>, fn_def_id: &DefId) -> bool {
                 let def_id = fn_def_id.clone();
                 let fn_defpath_str = tcx.def_path_str(def_id);
-                debug!("try_match_with_our_function {}", fn_defpath_str);
+                trace!("try_match_with_our_function {}", fn_defpath_str);
                 let prefix = format!("{}::", config::MONITORS_LIB_CRATE_NAME);
                 let Some(fn_defpath_str) = fn_defpath_str.strip_prefix(&prefix) else { 
                     return false;
