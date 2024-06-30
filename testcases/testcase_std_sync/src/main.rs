@@ -240,4 +240,26 @@ fn test_conflict_lock() {
         });
         thread::sleep(Duration::from_millis(1000));
     }
+
+    {
+        println!("test potential confilct lock");
+        let m1_arc = Arc::new(Mutex::new(7));
+        let m1_arc2 = Arc::clone(&m1_arc);
+        let m2_arc = Arc::new(Mutex::new(8));
+        let m2_arc2 = Arc::clone(&m2_arc);
+        let barrier_arc1 = Arc::new(Barrier::new(2));
+        let barrier_arc2 = Arc::clone(&barrier_arc1);
+        // test conlict lock order
+        thread::spawn(move || {
+            let g1 = m1_arc.lock().unwrap();
+            let g2 = m2_arc.lock().unwrap();
+            barrier_arc1.wait();
+        });
+        thread::spawn(move || {
+            barrier_arc2.wait();
+            let g2 = m2_arc2.lock().unwrap();
+            let g1 = m1_arc2.lock().unwrap();
+        });
+        thread::sleep(Duration::from_millis(1000));
+    }
 }
