@@ -69,7 +69,12 @@ monitors: &MonitorsInfo) {
                             Place::from(read_raw_pointer),
                             Rvalue::AddressOf(
                                 rustc_middle::ty::Mutability::Not,
-                                Place::from(read_local),
+                                Place {
+                                    local: read_local,
+                                    projection: tcx.mk_place_elems(&[
+                                        rustc_middle::mir::ProjectionElem::Deref
+                                    ]),
+                                },
                            ),
                         )
                     )
@@ -122,7 +127,12 @@ monitors: &MonitorsInfo) {
                             Place::from(write_raw_pointer),
                             Rvalue::AddressOf(
                                 rustc_middle::ty::Mutability::Not,
-                                Place::from(write_local),
+                                Place {
+                                    local: write_local,
+                                    projection: tcx.mk_place_elems(&[
+                                        rustc_middle::mir::ProjectionElem::Deref
+                                    ]),
+                                },
                            ),
                         )
                     )

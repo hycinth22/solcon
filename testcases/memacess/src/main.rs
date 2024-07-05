@@ -28,10 +28,11 @@ fn main() {
 }
 
 fn anotherfn(x: &i32) {
+    println!("anotherfn");
     let y = *x;
 }
 
 fn anotherfn2(x: &mut i32) {
-    println!("anotherfn");
+    println!("anotherfn2");
     *x = 1;
 }
