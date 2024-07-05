@@ -92,6 +92,11 @@ pub(crate) struct MonitorsInfo {
     pub condvar_wait_timeout_while_before_fn: Option<DefId>,
     #[monitor_defpath = "this_is_our_condvar_wait_timeout_while_after_handle_function"]
     pub condvar_wait_timeout_while_after_fn: Option<DefId>,
+
+    #[monitor_defpath = "this_is_our_mem_read_before_function"]
+    pub mem_read_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_mem_write_before_function"]
+    pub mem_write_before_fn: Option<DefId>,
 }
 
 pub trait MonitorsFinder {

@@ -10,7 +10,7 @@ use rustc_span::def_id::{CrateNum, DefId, DefIndex, LocalDefId, LOCAL_CRATE};
 
 pub(crate) use crate::utils;
 use crate::monitors_finder::{MonitorsFinder, MonitorsInfo};
-use crate::config;
+use crate::{config, mem_instrumenter};
 
 mod function_call_instrumenter;
 pub use function_call_instrumenter::FunctionCallInstrumenter;
@@ -262,11 +262,13 @@ fn inject_for_body<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>, monitors: &Mo
     object_drop_instrumenters: &[&dyn ObjectDropInstrumenter],
     our_passes: &[&dyn OurMirPass],
 ) {
+    // Instrument memory acesses
+    mem_instrumenter::instrument_mem_acesses(tcx, body, monitors);
     // Execute function call instrumenters
     execute_all_function_call_instrumenters(tcx, body, monitors, function_call_instrumenters);
     // Execute object drop instrumenters
     execute_all_obj_drop_instrumenters(tcx, body, monitors, object_drop_instrumenters);
-    // Execute our passes
+    // Execute our other passes
     for p in our_passes.iter() {
         let patch = p.run_pass(tcx, body, monitors);
         if let Some(patch) = patch {
@@ -389,3 +391,5 @@ monitors: &MonitorsInfo, object_drop_instrumenters: &[&dyn ObjectDropInstrumente
         }
     }
 }
+
+

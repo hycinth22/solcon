@@ -1,7 +1,7 @@
 use std::env;
 use std::path::Path;
 use std::str::FromStr;
-use rustc_middle::ty::{self, GenericArgs, Ty, TyCtxt};
+use rustc_middle::ty::{self, GenericArg, GenericArgs, Ty, TyCtxt};
 use rustc_middle::mir::*;
 use rustc_span::DUMMY_SP;
 use rustc_span::def_id::DefId;
@@ -352,7 +352,7 @@ pub fn alloc_unit_local<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::
     return new_local
 }
 
-pub fn instantiate_our_func<'tcx>(tcx: TyCtxt<'tcx>, our_func_def_id: DefId, generic_args: &'tcx GenericArgs<'tcx>, fn_span: rustc_span::Span) -> Operand<'tcx> {
+pub fn instantiate_our_func<'tcx>(tcx: TyCtxt<'tcx>, our_func_def_id: DefId, generic_args: impl IntoIterator<Item = GenericArg<'tcx>>, fn_span: rustc_span::Span) -> Operand<'tcx> {
     let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
     if is_generic_func {
         Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())

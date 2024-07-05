@@ -1,0 +1,12 @@
+[package]
+name = "testcase_memaccess_min"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[profile.dev]
+incremental = false
+
+[profile.release]
+incremental = false

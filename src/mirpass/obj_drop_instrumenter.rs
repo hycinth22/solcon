@@ -103,7 +103,7 @@ pub trait ObjectDropInstrumenter {
                     ];
                     let temp_ret = patch.new_temp(tcx.types.unit, DUMMY_SP);
                     patch.patch_terminator(drop_at_block, TerminatorKind::Call{
-                        func: crate::utils::instantiate_our_func(tcx, our_func_def_id, generic_args, DUMMY_SP),
+                        func: crate::utils::instantiate_our_func(tcx, our_func_def_id, *generic_args, DUMMY_SP),
                         args: our_call_args,
                         destination: Place::from(temp_ret),
                         target: Some(new_bb_run_drop),
@@ -147,7 +147,7 @@ pub trait ObjectDropInstrumenter {
                     ];
                     let temp_ret = patch.new_temp(tcx.types.unit, *fn_span);
                     patch.patch_terminator(drop_at_block, TerminatorKind::Call{
-                        func: crate::utils::instantiate_our_func(tcx, our_func_def_id, generic_args, *fn_span),
+                        func: crate::utils::instantiate_our_func(tcx, our_func_def_id, *generic_args, *fn_span),
                         args: our_call_args,
                         destination: Place::from(temp_ret),
                         target: Some(new_bb_run_drop),
@@ -196,7 +196,7 @@ pub trait ObjectDropInstrumenter {
                     statements: vec![],
                     terminator: Some(Terminator {
                         kind: TerminatorKind::Call { 
-                            func: crate::utils::instantiate_our_func(tcx, our_func_def_id, generic_args, DUMMY_SP),
+                            func: crate::utils::instantiate_our_func(tcx, our_func_def_id, *generic_args, DUMMY_SP),
                             args: our_call_args, 
                             destination: temp_ret.into(), 
                             target: Some(target.clone()),
@@ -247,7 +247,7 @@ pub trait ObjectDropInstrumenter {
                     statements: vec![],
                     terminator: Some(Terminator {
                         kind: TerminatorKind::Call { 
-                            func: crate::utils::instantiate_our_func(tcx, our_func_def_id, generic_args, *fn_span),
+                            func: crate::utils::instantiate_our_func(tcx, our_func_def_id, *generic_args, *fn_span),
                             args: our_call_args, 
                             destination: temp_ret.into(), 
                             target: target.clone(),

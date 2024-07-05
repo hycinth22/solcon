@@ -12,6 +12,7 @@
 extern crate tracing; // shared from rustc
 extern crate rustc_data_structures;
 extern crate rustc_driver;
+extern crate rustc_hash;
 extern crate rustc_hir;
 extern crate rustc_index;
 extern crate rustc_interface;
@@ -40,6 +41,7 @@ mod config;
 #[cfg(feature = "input_filter")]
 mod input_filter;
 mod mirpass;
+mod mem_instrumenter;
 pub(crate) mod monitors_finder;
 mod utils;
 
