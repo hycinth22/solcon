@@ -54,12 +54,6 @@ monitors: &MonitorsInfo) {
             let bb_is_cleanup = bb_data.is_cleanup;
             let span = bb_statements[statement_index].source_info.span;
             let statement_source_info = bb_statements[statement_index].source_info;
-            // let mut new_bb_statements = Vec::new();
-            // bb_statements[statement_index..].iter_mut().for_each(|s| {
-            //         new_bb_statements.push(s.clone());
-            //         s.make_nop();
-            //     }
-            // );
             info!("split_off {block:?} {statement_index:?}");
             if let Some(read_local) = read_local {
                 let new_bb_statements = bb_statements.split_off(statement_index);
@@ -107,7 +101,6 @@ monitors: &MonitorsInfo) {
                 });
                 *bb_terminator = Some(Terminator{
                     source_info: statement_source_info,
-                    // kind: TerminatorKind::Goto { target: newbb },
                     kind: TerminatorKind::Call {
                         func: utils::instantiate_our_func(tcx, mem_read_before_fn_defid, [], DUMMY_SP),
                         args: monitor_args,

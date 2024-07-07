@@ -353,12 +353,7 @@ pub fn alloc_unit_local<'tcx>(tcx: TyCtxt<'tcx>, local_decls: &mut rustc_index::
 }
 
 pub fn instantiate_our_func<'tcx>(tcx: TyCtxt<'tcx>, our_func_def_id: DefId, generic_args: impl IntoIterator<Item = GenericArg<'tcx>>, fn_span: rustc_span::Span) -> Operand<'tcx> {
-    let is_generic_func = tcx.generics_of(our_func_def_id).own_requires_monomorphization(); // generics.own_params.is_empty()
-    if is_generic_func {
-        Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
-    } else {
-        Operand::function_handle(tcx, our_func_def_id, [], fn_span.clone())
-    }
+    Operand::function_handle(tcx, our_func_def_id, generic_args, fn_span.clone())
 }
 
 pub fn is_fn_like_def(tcx: TyCtxt<'_>, def_id: &DefId) -> bool {
