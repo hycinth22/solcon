@@ -43,13 +43,15 @@ monitors: &MonitorsInfo) {
 
     let mut patch = MirPatch::new(body);
     let useless_temp = patch.new_temp(tcx.types.unit, DUMMY_SP);
+    patch.apply(body);
+
     for (block, deref_pointers) in deref_pointers_locations {
-        //continue;
-        let bb_data = &mut body.basic_blocks_mut()[block];
-        let bb_terminator = &mut bb_data.terminator;
-        let bb_statements = &mut bb_data.statements;
-        let bb_is_cleanup = bb_data.is_cleanup;
         for (statement_index, read_local, write_local) in deref_pointers {
+            let mut patch = MirPatch::new(body);
+            let bb_data = &mut body.basic_blocks_mut()[block];
+            let bb_terminator = &mut bb_data.terminator;
+            let bb_statements = &mut bb_data.statements;
+            let bb_is_cleanup = bb_data.is_cleanup;
             let span = bb_statements[statement_index].source_info.span;
             let statement_source_info = bb_statements[statement_index].source_info;
             // let mut new_bb_statements = Vec::new();
@@ -175,9 +177,9 @@ monitors: &MonitorsInfo) {
                     }
                 });
             }
+            patch.apply(body);
         }
     }
-    patch.apply(body);
     
 }
 
