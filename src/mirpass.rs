@@ -12,9 +12,9 @@ pub(crate) use crate::utils;
 use crate::monitors_finder::{MonitorsFinder, MonitorsInfo};
 use crate::{config, mem_instrumenter};
 
-mod function_call_instrumenter;
+use crate::function_call_instrumenter;
 pub use function_call_instrumenter::FunctionCallInstrumenter;
-mod obj_drop_instrumenter;
+use crate::obj_drop_instrumenter;
 pub use obj_drop_instrumenter::ObjectDropInstrumenter;
 
 #[cfg(feature = "enable_debug_passes")]

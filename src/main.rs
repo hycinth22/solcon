@@ -42,6 +42,8 @@ mod config;
 mod input_filter;
 mod mirpass;
 mod mem_instrumenter;
+mod function_call_instrumenter;
+mod obj_drop_instrumenter;
 pub(crate) mod monitors_finder;
 mod utils;
 
