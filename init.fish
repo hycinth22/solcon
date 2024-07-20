@@ -1,9 +1,10 @@
 #!/usr/bin/env fish
 
-set instrumenter_root (dirname (status -f))
+set project_root (dirname (status -f))
+set instrumenter_root $project_root/instrumenter
 set -x SOLCON_LOG "debug"
 set -x SOLCON_LOG_COLOR "auto"
-set -x SOLCON_MONITOR_LIB_PATH "$instrumenter_root/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
+set -x SOLCON_MONITOR_LIB_PATH "$project_root/runtime_library/target/debug/libthis_is_our_monitor_function.rlib"
 # set RUST_SYSROOT (rustc +nightly --print=sysroot)
 # set -x LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$RUST_SYSROOT/lib/"
 set -x RUSTC_LOG "warn"

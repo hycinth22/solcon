@@ -1,8 +1,9 @@
 @echo off
-set "instrumenter_root=%~dp0"
+set "project_root=%~dp0"
+set "instrumenter_root=%project_root%/instrumenter"
 set "SOLCON_LOG=debug"
 set "SOLCON_LOG_COLOR=auto"
-set "SOLCON_MONITOR_LIB_PATH=%instrumenter_root%this_is_our_monitor_function\target\debug\libthis_is_our_monitor_function.rlib"
+set "SOLCON_MONITOR_LIB_PATH=%project_root%this_is_our_monitor_function\target\debug\libthis_is_our_monitor_function.rlib"
 rem for /f "delims=" %%i in ('rustc +nightly --print=sysroot') do set "RUST_SYSROOT=%%i"
 rem set "PATH=%PATH%;%RUST_SYSROOT%\lib"
 set "RUSTC_LOG=warn"
