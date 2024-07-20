@@ -97,6 +97,11 @@ pub(crate) struct MonitorsInfo {
     pub mem_read_before_fn: Option<DefId>,
     #[monitor_defpath = "this_is_our_mem_write_before_function"]
     pub mem_write_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_mem_atomic_read_before_function"]
+    pub mem_atomic_read_before_fn: Option<DefId>,
+    #[monitor_defpath = "this_is_our_mem_atomic_write_before_function"]
+    pub mem_atomic_write_before_fn: Option<DefId>,
+
 }
 
 pub trait MonitorsFinder {
