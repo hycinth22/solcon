@@ -1,18 +1,18 @@
-Currently supports rust that latest update on 2024-05-12, rustc 1.80.0-nightly (ef0027897 2024-05-12)
+Currently supports rust nightly-2024-05-13, rustc 1.80.0-nightly (ef0027897 2024-05-12)
 
 # Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Install Rust toolchain & required components
-1. rustup toolchain install nightly-2024-05-12
-2. rustup +nightly-2024-05-12 component add rust-src
-3. rustup +nightly-2024-05-12 component add rustc-dev
-4. rustup +nightly-2024-05-12 component add llvm-tools-preview
+1. rustup toolchain install nightly-2024-05-13
+2. rustup +nightly-2024-05-13 component add rust-src
+3. rustup +nightly-2024-05-13 component add rustc-dev
+4. rustup +nightly-2024-05-13 component add llvm-tools-preview
 
 # Build & Install solcon_instrumenter using nightly
 1. git clone https://github.com/hycinth22/solcon_instrumenter
 2. cd solcon_instrumenter
-3. cargo +nightly-2024-05-12 build
+3. cargo +nightly-2024-05-13 build
 4. cargo install --path .
 
 # Configure solcon_instrumenter
