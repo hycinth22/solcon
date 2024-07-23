@@ -52,10 +52,11 @@ monitors: &MonitorsInfo) {
             let bb_terminator = &mut bb_data.terminator;
             let bb_statements = &mut bb_data.statements;
             let bb_is_cleanup = bb_data.is_cleanup;
-            let span = bb_statements[statement_index].source_info.span;
-            let statement_source_info = bb_statements[statement_index].source_info;
-            info!("split_off {block:?} {statement_index:?}");
+            info!("processing {block:?} {statement_index:?}");
+            let statement_source_info = if statement_index==bb_statements.len() {bb_terminator.as_ref().expect("statement_index==bb_statements.len() if used in bb terminator").source_info} else {bb_statements[statement_index].source_info};
+            let span = statement_source_info.span;
             if let Some(read_local) = read_local {
+                info!("split_off {block:?} {statement_index:?}");
                 let new_bb_statements = bb_statements.split_off(statement_index);
                 info!("instrumenting read {:?} {:?} {:?}", block, statement_index, read_local);
                 let read_raw_pointer = patch.new_temp(tcx.types.usize, span);
@@ -113,6 +114,7 @@ monitors: &MonitorsInfo) {
                 });
             }
             if let Some(write_local) = write_local {
+                info!("split_off {block:?} {statement_index:?}");
                 let new_bb_statements = bb_statements.split_off(statement_index);
                 info!("instrumenting write {:?} {:?} {:?}", block, statement_index, write_local);
                 let write_raw_pointer = patch.new_temp(tcx.types.usize, span);
