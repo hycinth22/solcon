@@ -216,7 +216,7 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
     }
     let crate_name = tcx.crate_name(*krate);
     let crate_name_str = crate_name.as_str();
-    const FILTERED_CRATES: [&str; 28] = [
+    const FILTERED_CRATES: [&str; 30] = [
         // from rustc library(s)
         "alloc",
         "backtrace",
@@ -247,6 +247,9 @@ fn is_filtered_crate(tcx: TyCtxt<'_>, krate: &CrateNum) -> bool {
         "std_detect",
         "libc",
         "proc-macro-crate",
+        "cfg-if",
+        // our runtime library
+        "this_is_our_monitor_function",
     ];
     if FILTERED_CRATES.contains(&crate_name_str) {
         debug!("filtered crate_name {crate_name_str}");

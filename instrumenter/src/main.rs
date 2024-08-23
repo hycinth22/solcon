@@ -217,6 +217,7 @@ fn init_logging(early_dcx: &EarlyDiagCtxt) {
 }
 
 struct Callbacks {
+    work: bool,
     need_init_logger: bool,
     file_name: String,
     output_directory: PathBuf,
@@ -226,6 +227,7 @@ struct Callbacks {
 impl Callbacks {
     pub fn new(need_init_logger: bool) -> Self {
         Self {
+            work: true,
             need_init_logger,
             file_name: String::new(),
             output_directory: PathBuf::default(),
@@ -240,7 +242,43 @@ fn is_root<'tcx>(tcx: rustc_middle::ty::TyCtxt<'tcx>, def_id: rustc_hir::def_id:
 
 impl rustc_driver::Callbacks for Callbacks {
     fn config(&mut self, config: &mut rustc_interface::interface::Config) {
-        self.file_name = config.input.source_name().prefer_remapped_unconditionaly().to_string();
+        if std::env::var("SOLCON_BE_RUSTC").is_ok() {
+            info!("Notice: SOLCON_BE_RUSTC is set");
+            self.work = false;
+        }else if let rustc_session::config::Input::File(filepath) = &config.input {
+            info!("Real file input {:?}", filepath);
+            // skip denpendency from cargo registry
+            let filepath = String::from(filepath.to_str().unwrap());
+            if filepath.contains("/.cargo/registry/") {
+                info!("Skip Processing denpendency from cargo registry");
+                self.work = false;
+            } else if filepath.contains("this_is_our_monitor_function") {
+                info!("Skip Processing this_is_our_monitor_function");
+                self.work = false;
+            }else {
+                self.work = true;
+            }
+        } else {
+            info!("Skip Processing input: {:?}", config.input.source_name());
+            self.work = false;
+        }
+        if !self.work {
+            // remove injected-externs if doesnot work
+            info!("Removing extern");
+            let entrys = config.opts.externs.iter().filter_map(
+                |(crate_name, entry)| {
+                    if crate_name == "this_is_our_monitor_function" {
+                        return None;
+                    }
+                    Some((crate_name.clone(), entry.clone()))
+                }
+            )
+            .collect();
+            config.opts.externs = rustc_session::config::Externs::new(entrys);
+            return;
+        }
+        let input_source_name = config.input.source_name();
+        self.file_name = input_source_name.prefer_remapped_unconditionaly().to_string();
         info!("Processing input file: {}", self.file_name);
         for c in &config.crate_check_cfg {
             debug!("config.crate_check_cfg {c}");
@@ -265,6 +303,9 @@ impl rustc_driver::Callbacks for Callbacks {
         _compiler: &rustc_interface::interface::Compiler,
         queries: &'tcx rustc_interface::Queries<'tcx>,
     ) -> rustc_driver::Compilation {
+        if !self.work {
+            return Compilation::Continue;
+        }
         let mut global_ctxt = queries.global_ctxt().unwrap();
         global_ctxt.enter(|tcx: rustc_middle::ty::TyCtxt| {
             mirpass::find_entry_fn(tcx);
@@ -279,6 +320,9 @@ impl rustc_driver::Callbacks for Callbacks {
         _compiler: &rustc_interface::interface::Compiler,
         queries: &'tcx rustc_interface::Queries<'tcx>,
     ) -> rustc_driver::Compilation {
+        if !self.work {
+            return Compilation::Continue;
+        }
         if self
             .output_directory
             .to_str()
