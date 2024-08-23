@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "testcase_memaccess"
+name = "testcase_memaccess_min"
 version = "0.1.0"
