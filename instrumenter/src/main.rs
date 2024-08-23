@@ -348,7 +348,6 @@ impl rustc_driver::Callbacks for Callbacks {
                     dcx.note(format!("skip to instrument compiling unit {}, because should_process report false", self.file_name));
                     return;
                 }
-                dcx.abort_if_errors();
             }
 
             // Transform
