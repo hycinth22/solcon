@@ -9,3 +9,5 @@ target/
 *.d
 rustc-ice-*.txt
 /solcon_testcase/all-log
+*.log
+*.binlog
