@@ -10,22 +10,25 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 4. rustup +nightly-2024-05-13 component add llvm-tools-preview
 
 # Build & Install solcon_instrumenter using nightly
-1. git clone https://github.com/hycinth22/solcon_instrumenter
+1. git clone https://github.com/hycinth22/solcon solcon_instrumenter
 2. cd solcon_instrumenter
-3. cargo +nightly-2024-05-13 build
-4. cargo install --path .
+3. export RUST_SYSROOT=$(rustc +nightly-2024-05-13 --print sysroot)
+4. cargo +nightly-2024-05-13 build
+5. cargo install --path .
 
 # Configure solcon_instrumenter
+1. export SOLCON_MONITOR_LIB_PATH="$(pwd)/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
+2. export SOLCON_LOG="info"
+3. export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$RUST_SYSROOT/lib"
+
+# Build monitor
 1. cd this_is_our_monitor_function
-2. cargo build
-3. export SOLCON_MONITOR_LIB_PATH="$(pwd)/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
-4. export SOLCON_LOG="info"
+2. ./build_monitor.sh
 
-# Attach solcon_instrumenter to rustc
-1. export RUST_SYSROOT=$(rustc --print sysroot)
-2. export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$RUST_SYSROOT/lib"
-3. export RUSTC_WRAPPER=~/.cargo/bin/solcon_instrumenter
+# Replace rustc with solcon_instrumenter & Build using our tool
+1. export RUSTC_WRAPPER=~/.cargo/bin/solcon_instrumenter
+Now, cargo will invoke our insturmenter instead of call rustc.
+2. cd /path/to/your/project/you/want/instrument
+3. cargo +nightly-2024-05-13 build
 
-Now, you can switch to your program directory & simply use `cargo build` to build any Rust program, and solcon_instrumenter will automatically instrument it when compiling.
-
-After you completed and dont need solcon_instrumenter, run `export RUSTC_WRAPPER=""` to resume original Rust compiler.
+After you finished and dont need solcon_instrumenter, run `export RUSTC_WRAPPER=""` to resume original Rust compiler.
