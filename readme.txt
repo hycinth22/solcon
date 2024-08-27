@@ -13,7 +13,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 1. git clone https://github.com/hycinth22/solcon solcon_instrumenter
 2. cd solcon_instrumenter/instrumenter
 3. export RUST_SYSROOT=$(rustc +nightly-2024-05-13 --print sysroot)
-4. cargo +nightly-2024-05-13 build
+4. cargo +nightly-2024-05-13 build --release
 5. cargo +nightly-2024-05-13 install --path .
 
 # Configure solcon_instrumenter
