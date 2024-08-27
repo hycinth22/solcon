@@ -14,7 +14,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. cd solcon_instrumenter/instrumenter
 3. export RUST_SYSROOT=$(rustc +nightly-2024-05-13 --print sysroot)
 4. cargo +nightly-2024-05-13 build
-5. cargo install --path .
+5. cargo +nightly-2024-05-13 install --path .
 
 # Configure solcon_instrumenter
 1. export SOLCON_MONITOR_LIB_PATH="$(pwd)/this_is_our_monitor_function/target/debug/libthis_is_our_monitor_function.rlib"
