@@ -11,7 +11,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build & Install solcon_instrumenter using nightly
 1. git clone https://github.com/hycinth22/solcon solcon_instrumenter
-2. cd solcon_instrumenter
+2. cd solcon_instrumenter/instrumenter
 3. export RUST_SYSROOT=$(rustc +nightly-2024-05-13 --print sysroot)
 4. cargo +nightly-2024-05-13 build
 5. cargo install --path .
